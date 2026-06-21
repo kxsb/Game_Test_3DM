@@ -3,24 +3,26 @@
     [double]$Depth = 250,
     [int]$MaxFaces = 50000,
     [string]$DxfPath = "..\VilleMTP_MTP_Modele3D\Centre_BATIMENTS_2016.dxf",
-    [string]$OutputPath = "assets\models\dxf_tile_centre.obj"
+    [string]$OutputPath = "assets\models\dxf_tile_centre.obj",
+    [double]$CenterX = [double]::NaN,
+    [double]$CenterY = [double]::NaN
 )
 
 $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path $DxfPath)) {
-    throw "DXF introuvable : $DxfPath"
+    throw "DXF not found: $DxfPath"
 }
 
 $ExtractScript = Join-Path $PSScriptRoot "dxf_extract_tile_obj.ps1"
 $RunScript = Join-Path $PSScriptRoot "run_windows.ps1"
 
 if (-not (Test-Path $ExtractScript)) {
-    throw "Script extracteur introuvable : $ExtractScript"
+    throw "Extractor script not found: $ExtractScript"
 }
 
 if (-not (Test-Path $RunScript)) {
-    throw "Script run_windows introuvable : $RunScript"
+    throw "Run script not found: $RunScript"
 }
 
 Write-Host "=== DXF TILE CENTRE ==="
@@ -30,10 +32,26 @@ Write-Host "Width : $Width"
 Write-Host "Depth : $Depth"
 Write-Host "MaxFaces : $MaxFaces"
 
-& $ExtractScript -Path $DxfPath -OutputPath $OutputPath -Width $Width -Depth $Depth -MaxFaces $MaxFaces
+$extractArgs = @{
+    Path = $DxfPath
+    OutputPath = $OutputPath
+    Width = $Width
+    Depth = $Depth
+    MaxFaces = $MaxFaces
+}
+
+if (-not [double]::IsNaN($CenterX)) {
+    $extractArgs["CenterX"] = $CenterX
+}
+
+if (-not [double]::IsNaN($CenterY)) {
+    $extractArgs["CenterY"] = $CenterY
+}
+
+& $ExtractScript @extractArgs
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Extraction tuile échouée."
+    throw "Tile extraction failed."
 }
 
 & $RunScript -ModelPath $OutputPath
