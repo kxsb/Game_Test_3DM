@@ -1,26 +1,15 @@
-# DXF tile pipeline
+# DXF tile pipeline, fix 1
 
-DXF001B ajoute une extraction spatiale par fenêtre.
+This pack fixes the PowerShell `op_Division` crash by avoiding array-based point structures during tile extraction.
 
-Exemple depuis la racine du projet :
-
-```powershell
-.\scripts\run_dxf_tile_centre.ps1 -Width 250 -Depth 250 -MaxFaces 50000
-```
-
-Ou avec un centre Lambert explicite :
+Usage:
 
 ```powershell
-.\scripts\dxf_extract_tile_obj.ps1 `
-  -Path "..\VilleMTP_MTP_Modele3D\Centre_BATIMENTS_2016.dxf" `
-  -OutputPath "assets\models\dxf_tile_custom.obj" `
-  -CenterX 770000 `
-  -CenterY 6282000 `
-  -Width 200 `
-  -Depth 200 `
-  -MaxFaces 50000
-
-.\scripts\run_windows.ps1 -ModelPath "assets\models\dxf_tile_custom.obj"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_dxf_tile_centre.ps1 -Width 250 -Depth 250 -MaxFaces 50000
 ```
 
-But : éviter l'effet « premières faces du fichier » et obtenir un morceau urbain cohérent.
+Optional explicit center:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_dxf_tile_centre.ps1 -Width 250 -Depth 250 -CenterX "770727.18" -CenterY "6279737.513"
+```

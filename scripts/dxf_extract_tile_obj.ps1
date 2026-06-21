@@ -2,17 +2,14 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Path,
 
-    [string]$OutputPath = "assets/models/dxf_tile.obj",
+    [string]$OutputPath = "assets/models/dxf_tile_centre.obj",
 
-    [double]$CenterX = [double]::NaN,
-    [double]$CenterY = [double]::NaN,
-
-    [double]$Width = 250.0,
-    [double]$Depth = 250.0,
-
+    [double]$Width = 250,
+    [double]$Depth = 250,
     [int]$MaxFaces = 50000,
 
-    [switch]$FullFileCenter
+    [string]$CenterX = "",
+    [string]$CenterY = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,60 +25,49 @@ function Format-Float {
     return $Value.ToString("0.###", $InvariantCulture)
 }
 
-function New-FaceEntity {
+function New-Face {
     return [pscustomobject]@{
         Layer = ""
-        Points = @(
-            @($null, $null, $null),
-            @($null, $null, $null),
-            @($null, $null, $null),
-            @($null, $null, $null)
-        )
+        X0 = $null; Y0 = $null; Z0 = $null
+        X1 = $null; Y1 = $null; Z1 = $null
+        X2 = $null; Y2 = $null; Z2 = $null
+        X3 = $null; Y3 = $null; Z3 = $null
     }
 }
 
 function Test-FaceComplete {
     param($Face)
 
-    if ($null -eq $Face) { return $false }
-
-    foreach ($p in $Face.Points) {
-        if ($null -eq $p[0] -or $null -eq $p[1] -or $null -eq $p[2]) {
-            return $false
-        }
-    }
-
-    return $true
+    return (
+        $null -ne $Face.X0 -and $null -ne $Face.Y0 -and $null -ne $Face.Z0 -and
+        $null -ne $Face.X1 -and $null -ne $Face.Y1 -and $null -ne $Face.Z1 -and
+        $null -ne $Face.X2 -and $null -ne $Face.Y2 -and $null -ne $Face.Z2 -and
+        $null -ne $Face.X3 -and $null -ne $Face.Y3 -and $null -ne $Face.Z3
+    )
 }
 
-function Get-FaceCentroidXY {
-    param($Face)
-
-    $x = 0.0
-    $y = 0.0
-
-    foreach ($p in $Face.Points) {
-        $x += $p[0]
-        $y += $p[1]
-    }
-
-    return @($x / 4.0, $y / 4.0)
-}
-
-function Read-DxfFaces {
+function Read-Dxf3DFaces {
     param(
         [string]$FilePath,
-        [scriptblock]$OnFace
+        [scriptblock]$OnFace,
+        [int]$StopAfterFaces = 0
     )
 
     $reader = [System.IO.StreamReader]::new((Resolve-Path $FilePath).Path)
     $current = $null
+    $facesSeen = 0
+    $stop = $false
 
-    function Flush-LocalFace {
+    function Flush-CurrentFace {
         if ($null -eq $script:current) { return }
 
         if (Test-FaceComplete $script:current) {
-            & $OnFace $script:current
+            $script:facesSeen++
+            & $script:OnFace $script:current
+
+            if ($script:StopAfterFaces -gt 0 -and $script:facesSeen -ge $script:StopAfterFaces) {
+                $script:stop = $true
+            }
         }
 
         $script:current = $null
@@ -97,189 +83,220 @@ function Read-DxfFaces {
             $value = $value.Trim()
 
             if ($code -eq "0") {
-                Flush-LocalFace
+                Flush-CurrentFace
+                if ($stop) { break }
 
                 if ($value -eq "3DFACE") {
-                    $script:current = New-FaceEntity
+                    $current = New-Face
                 }
-
                 continue
             }
 
-            if ($null -eq $script:current) { continue }
+            if ($null -eq $current) { continue }
 
             switch ($code) {
-                "8"  { $script:current.Layer = $value }
+                "8"  { $current.Layer = $value }
 
-                "10" { $script:current.Points[0][0] = Parse-DoubleInvariant $value }
-                "20" { $script:current.Points[0][1] = Parse-DoubleInvariant $value }
-                "30" { $script:current.Points[0][2] = Parse-DoubleInvariant $value }
+                "10" { $current.X0 = Parse-DoubleInvariant $value }
+                "20" { $current.Y0 = Parse-DoubleInvariant $value }
+                "30" { $current.Z0 = Parse-DoubleInvariant $value }
 
-                "11" { $script:current.Points[1][0] = Parse-DoubleInvariant $value }
-                "21" { $script:current.Points[1][1] = Parse-DoubleInvariant $value }
-                "31" { $script:current.Points[1][2] = Parse-DoubleInvariant $value }
+                "11" { $current.X1 = Parse-DoubleInvariant $value }
+                "21" { $current.Y1 = Parse-DoubleInvariant $value }
+                "31" { $current.Z1 = Parse-DoubleInvariant $value }
 
-                "12" { $script:current.Points[2][0] = Parse-DoubleInvariant $value }
-                "22" { $script:current.Points[2][1] = Parse-DoubleInvariant $value }
-                "32" { $script:current.Points[2][2] = Parse-DoubleInvariant $value }
+                "12" { $current.X2 = Parse-DoubleInvariant $value }
+                "22" { $current.Y2 = Parse-DoubleInvariant $value }
+                "32" { $current.Z2 = Parse-DoubleInvariant $value }
 
-                "13" { $script:current.Points[3][0] = Parse-DoubleInvariant $value }
-                "23" { $script:current.Points[3][1] = Parse-DoubleInvariant $value }
-                "33" { $script:current.Points[3][2] = Parse-DoubleInvariant $value }
+                "13" { $current.X3 = Parse-DoubleInvariant $value }
+                "23" { $current.Y3 = Parse-DoubleInvariant $value }
+                "33" { $current.Z3 = Parse-DoubleInvariant $value }
             }
         }
 
-        Flush-LocalFace
+        Flush-CurrentFace
     }
     finally {
         $reader.Close()
-        $script:current = $null
     }
 }
 
 if (-not (Test-Path $Path)) {
-    throw "Fichier DXF introuvable : $Path"
+    throw "DXF file not found: $Path"
 }
 
-if ([double]::IsNaN($CenterX) -or [double]::IsNaN($CenterY) -or $FullFileCenter) {
-    Write-Host "=== PASS 1 / CENTRE GLOBAL DXF ==="
+# -------------------------------------------------------------------
+# PASS 1: global bounds and automatic center
+# -------------------------------------------------------------------
+$GlobalMinX = [double]::PositiveInfinity
+$GlobalMinY = [double]::PositiveInfinity
+$GlobalMinZ = [double]::PositiveInfinity
+$GlobalMaxX = [double]::NegativeInfinity
+$GlobalMaxY = [double]::NegativeInfinity
+$GlobalMaxZ = [double]::NegativeInfinity
+$GlobalFaceCount = 0
 
-    $minX = [double]::PositiveInfinity
-    $minY = [double]::PositiveInfinity
-    $maxX = [double]::NegativeInfinity
-    $maxY = [double]::NegativeInfinity
-    $faceCount = 0
+Read-Dxf3DFaces -FilePath $Path -OnFace {
+    param($face)
 
-    Read-DxfFaces -FilePath $Path -OnFace {
-        param($Face)
-        $script:faceCount++
+    $script:GlobalFaceCount++
 
-        foreach ($p in $Face.Points) {
-            if ($p[0] -lt $script:minX) { $script:minX = $p[0] }
-            if ($p[1] -lt $script:minY) { $script:minY = $p[1] }
-            if ($p[0] -gt $script:maxX) { $script:maxX = $p[0] }
-            if ($p[1] -gt $script:maxY) { $script:maxY = $p[1] }
-        }
+    foreach ($x in @($face.X0, $face.X1, $face.X2, $face.X3)) {
+        if ($x -lt $script:GlobalMinX) { $script:GlobalMinX = $x }
+        if ($x -gt $script:GlobalMaxX) { $script:GlobalMaxX = $x }
     }
-
-    $CenterX = ($minX + $maxX) / 2.0
-    $CenterY = ($minY + $maxY) / 2.0
-
-    Write-Host "Faces parcourues : $faceCount"
-    Write-Host ("Centre auto : X={0:0.###} Y={1:0.###}" -f $CenterX, $CenterY)
-    Write-Host ("Bounds XY : min({0:0.###}, {1:0.###}) max({2:0.###}, {3:0.###})" -f $minX, $minY, $maxX, $maxY)
+    foreach ($y in @($face.Y0, $face.Y1, $face.Y2, $face.Y3)) {
+        if ($y -lt $script:GlobalMinY) { $script:GlobalMinY = $y }
+        if ($y -gt $script:GlobalMaxY) { $script:GlobalMaxY = $y }
+    }
+    foreach ($z in @($face.Z0, $face.Z1, $face.Z2, $face.Z3)) {
+        if ($z -lt $script:GlobalMinZ) { $script:GlobalMinZ = $z }
+        if ($z -gt $script:GlobalMaxZ) { $script:GlobalMaxZ = $z }
+    }
 }
+
+if ($GlobalFaceCount -eq 0) {
+    throw "No 3DFACE found in DXF."
+}
+
+if ($CenterX -eq "") {
+    $TileCenterX = ($GlobalMinX + $GlobalMaxX) / 2.0
+}
+else {
+    $TileCenterX = Parse-DoubleInvariant $CenterX
+}
+
+if ($CenterY -eq "") {
+    $TileCenterY = ($GlobalMinY + $GlobalMaxY) / 2.0
+}
+else {
+    $TileCenterY = Parse-DoubleInvariant $CenterY
+}
+
+$HalfWidth = $Width / 2.0
+$HalfDepth = $Depth / 2.0
+$TileMinX = $TileCenterX - $HalfWidth
+$TileMaxX = $TileCenterX + $HalfWidth
+$TileMinY = $TileCenterY - $HalfDepth
+$TileMaxY = $TileCenterY + $HalfDepth
+
+Write-Host "=== PASS 1 / GLOBAL DXF CENTER ==="
+Write-Host "Faces scanned: $GlobalFaceCount"
+Write-Host ("Auto center: X={0} Y={1}" -f (Format-Float $TileCenterX), (Format-Float $TileCenterY))
+Write-Host ("Bounds XY: min({0}, {1}) max({2}, {3})" -f (Format-Float $GlobalMinX), (Format-Float $GlobalMinY), (Format-Float $GlobalMaxX), (Format-Float $GlobalMaxY))
+
+# -------------------------------------------------------------------
+# PASS 2: select tile faces by centroid
+# -------------------------------------------------------------------
+$SelectedFaces = New-Object System.Collections.Generic.List[object]
+$TileMinZ = [double]::PositiveInfinity
+$TileMaxZ = [double]::NegativeInfinity
+$ScannedForTile = 0
 
 Write-Host ""
-Write-Host "=== PASS 2 / EXTRACTION TILE ==="
-Write-Host ("Fenêtre : centre({0:0.###}, {1:0.###}) largeur={2:0.###} profondeur={3:0.###}" -f $CenterX, $CenterY, $Width, $Depth)
+Write-Host "=== PASS 2 / TILE EXTRACTION ==="
+Write-Host ("Window: center({0}, {1}) width={2} depth={3}" -f (Format-Float $TileCenterX), (Format-Float $TileCenterY), (Format-Float $Width), (Format-Float $Depth))
 
-$halfW = $Width / 2.0
-$halfD = $Depth / 2.0
-$xMinWindow = $CenterX - $halfW
-$xMaxWindow = $CenterX + $halfW
-$yMinWindow = $CenterY - $halfD
-$yMaxWindow = $CenterY + $halfD
+Read-Dxf3DFaces -FilePath $Path -OnFace {
+    param($face)
 
-$faces = New-Object System.Collections.Generic.List[object]
-$seenFaces = 0
+    $script:ScannedForTile++
 
-Read-DxfFaces -FilePath $Path -OnFace {
-    param($Face)
+    $cx = ($face.X0 + $face.X1 + $face.X2 + $face.X3) / 4.0
+    $cy = ($face.Y0 + $face.Y1 + $face.Y2 + $face.Y3) / 4.0
 
-    if ($script:faces.Count -ge $MaxFaces) {
-        return
+    if ($cx -lt $script:TileMinX -or $cx -gt $script:TileMaxX) { return }
+    if ($cy -lt $script:TileMinY -or $cy -gt $script:TileMaxY) { return }
+
+    $script:SelectedFaces.Add($face)
+
+    foreach ($z in @($face.Z0, $face.Z1, $face.Z2, $face.Z3)) {
+        if ($z -lt $script:TileMinZ) { $script:TileMinZ = $z }
+        if ($z -gt $script:TileMaxZ) { $script:TileMaxZ = $z }
     }
+} -StopAfterFaces 0
 
-    $script:seenFaces++
-    $centroid = Get-FaceCentroidXY $Face
-    $cx = $centroid[0]
-    $cy = $centroid[1]
-
-    if ($cx -ge $script:xMinWindow -and $cx -le $script:xMaxWindow -and $cy -ge $script:yMinWindow -and $cy -le $script:yMaxWindow) {
-        $script:faces.Add($Face)
+if ($SelectedFaces.Count -gt $MaxFaces) {
+    $trimmed = New-Object System.Collections.Generic.List[object]
+    for ($i = 0; $i -lt $MaxFaces; $i++) {
+        $trimmed.Add($SelectedFaces[$i])
     }
+    $SelectedFaces = $trimmed
 }
 
-if ($faces.Count -eq 0) {
-    throw "Aucune face extraite dans la fenêtre. Essaie une largeur/profondeur plus grande ou un autre centre."
+if ($SelectedFaces.Count -eq 0) {
+    throw "No faces selected in tile. Try a bigger Width/Depth or explicit CenterX/CenterY."
 }
 
-$minX2 = [double]::PositiveInfinity
-$minY2 = [double]::PositiveInfinity
-$minZ2 = [double]::PositiveInfinity
-$maxX2 = [double]::NegativeInfinity
-$maxY2 = [double]::NegativeInfinity
-$maxZ2 = [double]::NegativeInfinity
-
-foreach ($face in $faces) {
-    foreach ($p in $face.Points) {
-        if ($p[0] -lt $minX2) { $minX2 = $p[0] }
-        if ($p[1] -lt $minY2) { $minY2 = $p[1] }
-        if ($p[2] -lt $minZ2) { $minZ2 = $p[2] }
-        if ($p[0] -gt $maxX2) { $maxX2 = $p[0] }
-        if ($p[1] -gt $maxY2) { $maxY2 = $p[1] }
-        if ($p[2] -gt $maxZ2) { $maxZ2 = $p[2] }
+# Recompute tile vertical bounds after optional trim
+$TileMinZ = [double]::PositiveInfinity
+$TileMaxZ = [double]::NegativeInfinity
+foreach ($face in $SelectedFaces) {
+    foreach ($z in @($face.Z0, $face.Z1, $face.Z2, $face.Z3)) {
+        if ($z -lt $TileMinZ) { $TileMinZ = $z }
+        if ($z -gt $TileMaxZ) { $TileMaxZ = $z }
     }
 }
 
-$centerTileX = ($minX2 + $maxX2) / 2.0
-$centerTileY = ($minY2 + $maxY2) / 2.0
-$groundZ = $minZ2
-
-$outputDir = Split-Path $OutputPath
-if ($outputDir) {
-    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+$OutputDir = Split-Path $OutputPath
+if ($OutputDir) {
+    New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 }
 
-$lines = New-Object System.Collections.Generic.List[string]
-$lines.Add("# Montpellier Game DXF tile OBJ")
-$lines.Add("# Source: $Path")
-$lines.Add("# Faces extracted: $($faces.Count)")
-$lines.Add("# Tile center Lambert: X=$(Format-Float $CenterX) Y=$(Format-Float $CenterY)")
-$lines.Add("# Transform: Lambert X/Y -> game X/Z, altitude Z -> game Y")
-
+$writer = [System.IO.StreamWriter]::new($OutputPath, $false, [System.Text.Encoding]::ASCII)
 $vertexIndex = 1
 $triangleCount = 0
 
-foreach ($face in $faces) {
-    $indices = @()
+try {
+    $writer.WriteLine("# Montpellier Game DXF tile OBJ")
+    $writer.WriteLine("# Source: $Path")
+    $writer.WriteLine("# Selected faces: $($SelectedFaces.Count)")
+    $writer.WriteLine("# Transform: Lambert X/Y -> game X/Z, altitude Z -> game Y")
+    $writer.WriteLine(("# Tile center: {0} {1}" -f (Format-Float $TileCenterX), (Format-Float $TileCenterY)))
+    $writer.WriteLine(("# Tile size: {0} {1}" -f (Format-Float $Width), (Format-Float $Depth)))
 
-    foreach ($p in $face.Points) {
-        $gx = $p[0] - $centerTileX
-        $gy = $p[2] - $groundZ
-        $gz = $p[1] - $centerTileY
+    foreach ($face in $SelectedFaces) {
+        $points = @(
+            @($face.X0, $face.Y0, $face.Z0),
+            @($face.X1, $face.Y1, $face.Z1),
+            @($face.X2, $face.Y2, $face.Z2),
+            @($face.X3, $face.Y3, $face.Z3)
+        )
 
-        $lines.Add("v $(Format-Float $gx) $(Format-Float $gy) $(Format-Float $gz)")
-        $indices += $vertexIndex
-        $vertexIndex++
-    }
+        $indices = @()
 
-    $p2 = $face.Points[2]
-    $p3 = $face.Points[3]
+        foreach ($p in $points) {
+            $gx = [double]$p[0] - $TileCenterX
+            $gy = [double]$p[2] - $TileMinZ
+            $gz = [double]$p[1] - $TileCenterY
 
-    $same34 = (
-        [Math]::Abs($p2[0] - $p3[0]) -lt 0.0001 -and
-        [Math]::Abs($p2[1] - $p3[1]) -lt 0.0001 -and
-        [Math]::Abs($p2[2] - $p3[2]) -lt 0.0001
-    )
+            $writer.WriteLine("v $(Format-Float $gx) $(Format-Float $gy) $(Format-Float $gz)")
+            $indices += $vertexIndex
+            $vertexIndex++
+        }
 
-    $lines.Add("f $($indices[0]) $($indices[1]) $($indices[2])")
-    $triangleCount++
+        $same34 = (
+            [Math]::Abs($face.X2 - $face.X3) -lt 0.0001 -and
+            [Math]::Abs($face.Y2 - $face.Y3) -lt 0.0001 -and
+            [Math]::Abs($face.Z2 - $face.Z3) -lt 0.0001
+        )
 
-    if (-not $same34) {
-        $lines.Add("f $($indices[0]) $($indices[2]) $($indices[3])")
+        $writer.WriteLine("f $($indices[0]) $($indices[1]) $($indices[2])")
         $triangleCount++
+
+        if (-not $same34) {
+            $writer.WriteLine("f $($indices[0]) $($indices[2]) $($indices[3])")
+            $triangleCount++
+        }
     }
 }
+finally {
+    $writer.Close()
+}
 
-Set-Content -Path $OutputPath -Value $lines -Encoding ASCII
-
-Write-Host "=== DXF TILE OBJ ==="
-Write-Host "Source : $Path"
-Write-Host "Output : $OutputPath"
-Write-Host "Faces retenues : $($faces.Count)"
-Write-Host "Vertices : $($vertexIndex - 1)"
-Write-Host "Triangles : $triangleCount"
-Write-Host ("Bounds source selection: min({0:0.###}, {1:0.###}, {2:0.###}) max({3:0.###}, {4:0.###}, {5:0.###})" -f $minX2, $minY2, $minZ2, $maxX2, $maxY2, $maxZ2)
-Write-Host ("Bounds jeu approx: largeur={0:0.###} profondeur={1:0.###} hauteur={2:0.###}" -f ($maxX2 - $minX2), ($maxY2 - $minY2), ($maxZ2 - $minZ2))
+Write-Host "Selected faces: $($SelectedFaces.Count)"
+Write-Host "Output: $OutputPath"
+Write-Host "Vertices: $($vertexIndex - 1)"
+Write-Host "Triangles: $triangleCount"
+Write-Host ("Tile Z bounds: min={0} max={1}" -f (Format-Float $TileMinZ), (Format-Float $TileMaxZ))
