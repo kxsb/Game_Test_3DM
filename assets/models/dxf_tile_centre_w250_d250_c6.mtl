@@ -1,0 +1,14 @@
+# Montpellier Game tile materials
+newmtl ground
+Ka 0.35 0.35 0.35
+Kd 0.42 0.46 0.42
+Ks 0.00 0.00 0.00
+d 1.0
+illum 1
+
+newmtl buildings
+Ka 0.55 0.55 0.55
+Kd 0.78 0.78 0.78
+Ks 0.00 0.00 0.00
+d 1.0
+illum 1

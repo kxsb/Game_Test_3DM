@@ -1,0 +1,15 @@
+# Local heavy Montpellier source data
+montpellier_game/
+/montpellier_game/
+VilleMTP*/
+**/VilleMTP*/
+*Modele3D*/
+**/*Modele3D*/
+*.dxf
+*.DXF
+*.zip
+*.7z
+*.rar
+*.docx
+assets/models/dxf_sample*.obj
+assets/models/dxf_sample*.collisions.txt

@@ -1,0 +1,2 @@
+assets/models/dxf_tile*.obj
+assets/models/dxf_tile*.collisions.txt
