@@ -7,9 +7,11 @@
     [double]$CenterX = [double]::NaN,
     [double]$CenterY = [double]::NaN,
     [switch]$NoCollisions,
-    [double]$CollisionMinHeight = 1.5,
-    [double]$CollisionMinThickness = 0.35,
-    [int]$CollisionMaxBoxes = 20000
+    [double]$CollisionCellSize = 2.0,
+    [double]$CollisionMinWallHeight = 1.8,
+    [double]$CollisionMinColumnHeight = 1.5,
+    [double]$CollisionColumnPadding = 0.10,
+    [int]$CollisionMaxBoxes = 12000
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,12 +67,14 @@ if (-not $NoCollisions) {
     }
 
     Write-Host ""
-    Write-Host "=== GENERATE COLLISION SIDECAR ==="
+    Write-Host "=== GENERATE GRID COLLISION SIDECAR ==="
 
     & $CollisionScript `
         -Path $OutputPath `
-        -MinHeight $CollisionMinHeight `
-        -MinThickness $CollisionMinThickness `
+        -CellSize $CollisionCellSize `
+        -MinWallHeight $CollisionMinWallHeight `
+        -MinColumnHeight $CollisionMinColumnHeight `
+        -ColumnPadding $CollisionColumnPadding `
         -MaxBoxes $CollisionMaxBoxes
 }
 

@@ -4,11 +4,15 @@ param(
 
     [string]$OutputPath = "",
 
-    [double]$MinHeight = 1.5,
+    [double]$CellSize = 2.0,
 
-    [double]$MinThickness = 0.35,
+    [double]$MinWallHeight = 1.8,
 
-    [int]$MaxBoxes = 20000
+    [double]$MinColumnHeight = 1.5,
+
+    [double]$ColumnPadding = 0.10,
+
+    [int]$MaxBoxes = 12000
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,58 +45,90 @@ function New-Vector3 {
     }
 }
 
-function Add-CollisionBoxFromTriangle {
+function Get-Min3 {
+    param([double]$A, [double]$B, [double]$C)
+
+    return [Math]::Min([Math]::Min($A, $B), $C)
+}
+
+function Get-Max3 {
+    param([double]$A, [double]$B, [double]$C)
+
+    return [Math]::Max([Math]::Max($A, $B), $C)
+}
+
+function Add-CellOccupation {
+    param(
+        [hashtable]$Cells,
+        [int]$Ix,
+        [int]$Iz,
+        [double]$MinY,
+        [double]$MaxY
+    )
+
+    $key = "$Ix`:$Iz"
+
+    if (-not $Cells.ContainsKey($key)) {
+        $Cells[$key] = [pscustomobject]@{
+            Ix = $Ix
+            Iz = $Iz
+            MinY = $MinY
+            MaxY = $MaxY
+        }
+
+        return
+    }
+
+    if ($MinY -lt $Cells[$key].MinY) {
+        $Cells[$key].MinY = $MinY
+    }
+
+    if ($MaxY -gt $Cells[$key].MaxY) {
+        $Cells[$key].MaxY = $MaxY
+    }
+}
+
+function Add-TriangleToCollisionGrid {
     param(
         [object]$A,
         [object]$B,
         [object]$C,
-        [System.Collections.Generic.List[string]]$Lines
+        [hashtable]$Cells
     )
 
-    if ($script:BoxCount -ge $script:MaxBoxCount) {
+    $minX = Get-Min3 $A.X $B.X $C.X
+    $maxX = Get-Max3 $A.X $B.X $C.X
+
+    $minY = Get-Min3 $A.Y $B.Y $C.Y
+    $maxY = Get-Max3 $A.Y $B.Y $C.Y
+
+    $minZ = Get-Min3 $A.Z $B.Z $C.Z
+    $maxZ = Get-Max3 $A.Z $B.Z $C.Z
+
+    $height = $maxY - $minY
+
+    # On ne garde que les faces qui montent suffisamment.
+    # Cela élimine la plupart des sols, toits plats, corniches et détails horizontaux.
+    if ($height -lt $script:MinimumWallHeight) {
         return
     }
 
-    $minX = [Math]::Min([Math]::Min($A.X, $B.X), $C.X)
-    $maxX = [Math]::Max([Math]::Max($A.X, $B.X), $C.X)
+    $minIx = [Math]::Floor($minX / $script:GridCellSize)
+    $maxIx = [Math]::Floor($maxX / $script:GridCellSize)
 
-    $minY = [Math]::Min([Math]::Min($A.Y, $B.Y), $C.Y)
-    $maxY = [Math]::Max([Math]::Max($A.Y, $B.Y), $C.Y)
+    $minIz = [Math]::Floor($minZ / $script:GridCellSize)
+    $maxIz = [Math]::Floor($maxZ / $script:GridCellSize)
 
-    $minZ = [Math]::Min([Math]::Min($A.Z, $B.Z), $C.Z)
-    $maxZ = [Math]::Max([Math]::Max($A.Z, $B.Z), $C.Z)
-
-    $sizeX = $maxX - $minX
-    $sizeY = $maxY - $minY
-    $sizeZ = $maxZ - $minZ
-
-    # On garde surtout les surfaces verticales ou très inclinées.
-    # Les toits plats et les petits détails horizontaux ne doivent pas devenir des murs invisibles.
-    if ($sizeY -lt $script:MinimumHeight) {
-        return
+    for ($ix = $minIx; $ix -le $maxIx; $ix++) {
+        for ($iz = $minIz; $iz -le $maxIz; $iz++) {
+            Add-CellOccupation `
+                -Cells $Cells `
+                -Ix $ix `
+                -Iz $iz `
+                -MinY $minY `
+                -MaxY $maxY
+        }
     }
-
-    if ($sizeX -lt $script:MinimumThickness) {
-        $sizeX = $script:MinimumThickness
-    }
-
-    if ($sizeY -lt $script:MinimumThickness) {
-        $sizeY = $script:MinimumThickness
-    }
-
-    if ($sizeZ -lt $script:MinimumThickness) {
-        $sizeZ = $script:MinimumThickness
-    }
-
-    $centerX = ($minX + $maxX) / 2.0
-    $centerY = ($minY + $maxY) / 2.0
-    $centerZ = ($minZ + $maxZ) / 2.0
-
-    $Lines.Add(
-        "box $(ConvertTo-InvariantFloat $centerX) $(ConvertTo-InvariantFloat $centerY) $(ConvertTo-InvariantFloat $centerZ) $(ConvertTo-InvariantFloat $sizeX) $(ConvertTo-InvariantFloat $sizeY) $(ConvertTo-InvariantFloat $sizeZ)"
-    )
-
-    $script:BoxCount++
 }
 
 if (-not (Test-Path $Path)) {
@@ -104,20 +140,14 @@ if (-not $OutputPath) {
 }
 
 $vertices = New-Object System.Collections.Generic.List[object]
-$collisionLines = New-Object System.Collections.Generic.List[string]
+$cells = @{}
 
-$collisionLines.Add("# Montpellier Game collision sidecar generated from OBJ")
-$collisionLines.Add("# Format: box cx cy cz sx sy sz")
-$collisionLines.Add("# Source OBJ: $Path")
-$collisionLines.Add("# MinHeight: $MinHeight")
-$collisionLines.Add("# MinThickness: $MinThickness")
-
-$script:BoxCount = 0
-$script:MaxBoxCount = $MaxBoxes
-$script:MinimumHeight = $MinHeight
-$script:MinimumThickness = $MinThickness
+$script:GridCellSize = $CellSize
+$script:MinimumWallHeight = $MinWallHeight
 
 $faceCount = 0
+$usedFaceCount = 0
+
 $reader = [System.IO.StreamReader]::new((Resolve-Path $Path).Path)
 
 try {
@@ -162,7 +192,6 @@ try {
                 $indices += $idx
             }
 
-            # Triangulation éventuelle en éventail, même si nos OBJ actuels sont déjà triangulés.
             for ($i = 1; $i -lt $indices.Count - 1; $i++) {
                 $aIndex = $indices[0] - 1
                 $bIndex = $indices[$i] - 1
@@ -176,11 +205,17 @@ try {
                     continue
                 }
 
-                Add-CollisionBoxFromTriangle `
+                $beforeCount = $cells.Count
+
+                Add-TriangleToCollisionGrid `
                     -A $vertices[$aIndex] `
                     -B $vertices[$bIndex] `
                     -C $vertices[$cIndex] `
-                    -Lines $collisionLines
+                    -Cells $cells
+
+                if ($cells.Count -gt $beforeCount) {
+                    $usedFaceCount++
+                }
 
                 $faceCount++
             }
@@ -191,11 +226,53 @@ finally {
     $reader.Close()
 }
 
+$collisionLines = New-Object System.Collections.Generic.List[string]
+$collisionLines.Add("# Montpellier Game collision sidecar generated from OBJ grid")
+$collisionLines.Add("# Format: box cx cy cz sx sy sz")
+$collisionLines.Add("# Source OBJ: $Path")
+$collisionLines.Add("# CellSize: $CellSize")
+$collisionLines.Add("# MinWallHeight: $MinWallHeight")
+$collisionLines.Add("# MinColumnHeight: $MinColumnHeight")
+$collisionLines.Add("# ColumnPadding: $ColumnPadding")
+
+$boxCount = 0
+
+foreach ($entry in $cells.GetEnumerator() | Sort-Object Name) {
+    if ($boxCount -ge $MaxBoxes) {
+        break
+    }
+
+    $cell = $entry.Value
+    $height = $cell.MaxY - $cell.MinY
+
+    if ($height -lt $MinColumnHeight) {
+        continue
+    }
+
+    $centerX = (($cell.Ix + 0.5) * $CellSize)
+    $centerZ = (($cell.Iz + 0.5) * $CellSize)
+
+    $centerY = ($cell.MinY + $cell.MaxY) / 2.0
+
+    $sizeX = $CellSize + $ColumnPadding
+    $sizeY = $height
+    $sizeZ = $CellSize + $ColumnPadding
+
+    $collisionLines.Add(
+        "box $(ConvertTo-InvariantFloat $centerX) $(ConvertTo-InvariantFloat $centerY) $(ConvertTo-InvariantFloat $centerZ) $(ConvertTo-InvariantFloat $sizeX) $(ConvertTo-InvariantFloat $sizeY) $(ConvertTo-InvariantFloat $sizeZ)"
+    )
+
+    $boxCount++
+}
+
 Set-Content -Path $OutputPath -Value $collisionLines -Encoding ASCII
 
-Write-Host "=== COLLISION SIDECAR FROM OBJ ==="
+Write-Host "=== COLLISION SIDECAR FROM OBJ GRID ==="
 Write-Host "Source OBJ : $Path"
 Write-Host "Output : $OutputPath"
 Write-Host "Vertices read : $($vertices.Count)"
 Write-Host "Triangles scanned : $faceCount"
-Write-Host "Collision boxes : $BoxCount"
+Write-Host "Faces contributing : $usedFaceCount"
+Write-Host "Occupied cells : $($cells.Count)"
+Write-Host "Collision boxes : $boxCount"
+Write-Host "Cell size : $CellSize"
