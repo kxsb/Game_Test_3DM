@@ -492,7 +492,7 @@ void DrawScene(const Scene& scene) {
             scene.photoModel.model,
             scene.photoModel.position,
             scene.photoModel.scale,
-            Fade(WHITE, 0.55f)
+            Fade(LIGHTGRAY, 0.32f)
         );
     }
 }
@@ -643,6 +643,7 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
 
 
 

@@ -8,7 +8,8 @@
     [double]$OffsetZ = -173.27,
     [double]$Scale = 1.0,
 
-    [double]$Margin = 18.0
+    [double]$Margin = 8.0,
+    [double]$MaxTriangleEdge = 45.0
 )
 
 $ErrorActionPreference = "Stop"
@@ -122,6 +123,7 @@ Write-Host "OutputDir : $OutputDir"
 Write-Host "Initial offset : $OffsetX $OffsetY $OffsetZ"
 Write-Host "Scale : $Scale"
 Write-Host "Margin : $Margin"
+Write-Host "MaxTriangleEdge : $MaxTriangleEdge"
 
 if (-not (Test-Path $CityObj)) {
     throw "City OBJ introuvable : $CityObj"
@@ -219,16 +221,26 @@ foreach ($face in $faces) {
     $b = Transform-PhotoVertex $vertices[$face[1] - 1]
     $c = Transform-PhotoVertex $vertices[$face[2] - 1]
 
-    $cx = ($a.X + $b.X + $c.X) / 3.0
-    $cy = ($a.Y + $b.Y + $c.Y) / 3.0
-    $cz = ($a.Z + $b.Z + $c.Z) / 3.0
-
     $inside =
-        $cx -ge $cropMinX -and $cx -le $cropMaxX -and
-        $cy -ge $cropMinY -and $cy -le $cropMaxY -and
-        $cz -ge $cropMinZ -and $cz -le $cropMaxZ
+        $a.X -ge $cropMinX -and $a.X -le $cropMaxX -and
+        $a.Y -ge $cropMinY -and $a.Y -le $cropMaxY -and
+        $a.Z -ge $cropMinZ -and $a.Z -le $cropMaxZ -and
+        $b.X -ge $cropMinX -and $b.X -le $cropMaxX -and
+        $b.Y -ge $cropMinY -and $b.Y -le $cropMaxY -and
+        $b.Z -ge $cropMinZ -and $b.Z -le $cropMaxZ -and
+        $c.X -ge $cropMinX -and $c.X -le $cropMaxX -and
+        $c.Y -ge $cropMinY -and $c.Y -le $cropMaxY -and
+        $c.Z -ge $cropMinZ -and $c.Z -le $cropMaxZ
 
     if (-not $inside) {
+        continue
+    }
+
+    $edgeAB = [Math]::Sqrt([Math]::Pow($a.X - $b.X, 2) + [Math]::Pow($a.Y - $b.Y, 2) + [Math]::Pow($a.Z - $b.Z, 2))
+    $edgeBC = [Math]::Sqrt([Math]::Pow($b.X - $c.X, 2) + [Math]::Pow($b.Y - $c.Y, 2) + [Math]::Pow($b.Z - $c.Z, 2))
+    $edgeCA = [Math]::Sqrt([Math]::Pow($c.X - $a.X, 2) + [Math]::Pow($c.Y - $a.Y, 2) + [Math]::Pow($c.Z - $a.Z, 2))
+
+    if ($edgeAB -gt $MaxTriangleEdge -or $edgeBC -gt $MaxTriangleEdge -or $edgeCA -gt $MaxTriangleEdge) {
         continue
     }
 
@@ -325,7 +337,7 @@ $out | Set-Content $outputObj -Encoding ASCII
     "Ka 0.75 0.75 0.72",
     "Kd 0.95 0.93 0.86",
     "Ks 0.00 0.00 0.00",
-    "d 0.55",
+    "d 0.35",
     "illum 1"
 ) | Set-Content $outputMtl -Encoding ASCII
 
@@ -347,3 +359,4 @@ Write-Host ("  Z {0} -> {1}" -f (Format-Double $finalBounds.MinZ), (Format-Doubl
 Write-Host ""
 Write-Host "Use this overlay:"
 Write-Host ".\build\montpellier.exe $CityObj $outputObj"
+
