@@ -4,7 +4,7 @@
 #include "raylib.h"
 
 void DrawHud(const Scene& scene, const PlayerControllerState& player) {
-    DrawRectangle(8, 8, 860, 300, Fade(RAYWHITE, 0.88f));
+    DrawRectangle(8, 8, 980, 370, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
 
@@ -110,7 +110,15 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     }
 
     DrawText(
-        "B collisions rouges | G sol/heightfield | V wireframe | N bounds bleus",
+        TextFormat(
+            "Visuel: CityGML %s | Photo %s | Photo offset %.2f %.2f %.2f | scale %.3f",
+            scene.primaryModelVisible ? "ON" : "OFF",
+            (scene.photoModel.loaded && scene.photoModel.visible) ? "ON" : "OFF",
+            scene.photoModel.position.x,
+            scene.photoModel.position.y,
+            scene.photoModel.position.z,
+            scene.photoModel.scale
+        ),
         16,
         196,
         16,
@@ -118,7 +126,7 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | TAB souris",
+        "B collisions | G sol/heightfield | V wireframe | N bounds | P photo | X CityGML",
         16,
         218,
         16,
@@ -126,9 +134,25 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        "F marche/vol | Shift accelere | Ctrl ralentit | R reset",
+        "Align photo: I/K avant-arriere | J/L gauche-droite | U/O hauteur | +/- echelle",
         16,
         240,
+        16,
+        GRAY
+    );
+
+    DrawText(
+        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | TAB souris",
+        16,
+        262,
+        16,
+        GRAY
+    );
+
+    DrawText(
+        "F marche/vol | Shift accelere | Ctrl ralentit | R reset",
+        16,
+        284,
         16,
         GRAY
     );
@@ -140,13 +164,14 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
             player.position.z
         ),
         16,
-        262,
+        306,
         16,
         GRAY
     );
 
-    DrawFPS(16, 290);
+    DrawFPS(16, 334);
 }
+
 
 
 

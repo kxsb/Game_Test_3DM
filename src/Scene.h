@@ -34,9 +34,24 @@ struct SceneDebugRenderOptions {
     bool showWireframe = false;
 };
 
+struct ScenePhotoModel {
+    Model model = {};
+    bool loaded = false;
+    bool visible = false;
+
+    std::string path;
+
+    BoundingBox bounds = {};
+    bool hasBounds = false;
+
+    Vector3 position = { 0.0f, 0.0f, 0.0f };
+    float scale = 1.0f;
+};
+
 struct Scene {
     Model model = {};
     bool modelLoaded = false;
+    bool primaryModelVisible = true;
 
     std::string modelPath;
     std::string collisionSidecarPath;
@@ -47,10 +62,13 @@ struct Scene {
 
     ProceduralCity proceduralCity;
     CollisionWorld collisionWorld;
+
+    ScenePhotoModel photoModel;
 };
 
-void LoadScene(Scene* scene, const char* modelPath);
+void LoadScene(Scene* scene, const char* modelPath, const char* photoModelPath = nullptr);
 void DrawScene(const Scene& scene);
+void UpdateScenePhotoModelControls(Scene* scene);
 void DrawSceneDebug(
     const Scene& scene,
     const SceneDebugRenderOptions& options
@@ -59,3 +77,4 @@ void UnloadScene(Scene* scene);
 
 void AdjustSceneGround(Scene* scene, float deltaY);
 void ResetSceneGroundToEstimated(Scene* scene);
+

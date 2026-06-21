@@ -25,6 +25,18 @@ namespace {
 
         return AppConfig::DefaultModelPath;
     }
+
+    const char* ResolvePhotoModelPath(int argc, char** argv) {
+        if (argc > 2) {
+            return argv[2];
+        }
+
+        if (FileExists(AppConfig::DefaultPhotomodelPath)) {
+            return AppConfig::DefaultPhotomodelPath;
+        }
+
+        return nullptr;
+    }
 }
 
 int RunGame(int argc, char** argv) {
@@ -36,10 +48,11 @@ int RunGame(int argc, char** argv) {
     SetTargetFPS(AppConfig::TargetFps);
 
     Scene scene = {};
-    LoadScene(&scene, ResolveModelPath(argc, argv));
+    LoadScene(&scene, ResolveModelPath(argc, argv), ResolvePhotoModelPath(argc, argv));
 
     while (!WindowShouldClose()) {
         UpdatePlayerController(&player, scene.collisionWorld);
+        UpdateScenePhotoModelControls(&scene);
         ApplyPlayerToCamera(player, &camera);
 
         BeginDrawing();
@@ -77,4 +90,5 @@ int RunGame(int argc, char** argv) {
 
     return 0;
 }
+
 

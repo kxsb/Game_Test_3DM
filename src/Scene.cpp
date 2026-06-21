@@ -88,6 +88,84 @@ namespace {
         return modelPath.substr(0, dotPos) + ".ground.txt";
     }
 
+    Vector3 CenterOfBounds(const BoundingBox& bounds) {
+        return {
+            (bounds.min.x + bounds.max.x) * 0.5f,
+            (bounds.min.y + bounds.max.y) * 0.5f,
+            (bounds.min.z + bounds.max.z) * 0.5f
+        };
+    }
+
+    BoundingBox TransformBounds(const BoundingBox& bounds, Vector3 position, float scale) {
+        BoundingBox transformed = {};
+        transformed.min = {
+            bounds.min.x * scale + position.x,
+            bounds.min.y * scale + position.y,
+            bounds.min.z * scale + position.z
+        };
+        transformed.max = {
+            bounds.max.x * scale + position.x,
+            bounds.max.y * scale + position.y,
+            bounds.max.z * scale + position.z
+        };
+        return transformed;
+    }
+
+    Vector3 ComputeInitialPhotoModelPosition(const Scene& scene, const BoundingBox& photoBounds, float scale) {
+        Vector3 position = { 0.0f, 0.0f, 0.0f };
+
+        if (!scene.modelLoaded || !scene.modelStats.hasBounds) {
+            return position;
+        }
+
+        const Vector3 cityCenter = CenterOfBounds(scene.modelStats.bounds);
+        const Vector3 photoCenter = CenterOfBounds(photoBounds);
+
+        position.x = cityCenter.x - photoCenter.x * scale;
+        position.y = scene.modelStats.bounds.min.y - photoBounds.min.y * scale;
+        position.z = cityCenter.z - photoCenter.z * scale;
+
+        return position;
+    }
+
+    void LoadPhotoModel(Scene* scene, const char* photoModelPath) {
+        scene->photoModel = {};
+
+        if (photoModelPath == nullptr || photoModelPath[0] == '\0') {
+            TraceLog(LOG_INFO, "Photomodel: no path provided");
+            return;
+        }
+
+        if (!FileExists(photoModelPath)) {
+            TraceLog(LOG_WARNING, TextFormat("Photomodel file not found: %s", photoModelPath));
+            return;
+        }
+
+        scene->photoModel.model = LoadModel(photoModelPath);
+        scene->photoModel.loaded = true;
+        scene->photoModel.visible = true;
+        scene->photoModel.path = photoModelPath;
+        scene->photoModel.bounds = ComputeModelBoundingBox(&scene->photoModel.model);
+        scene->photoModel.hasBounds = true;
+        scene->photoModel.scale = 1.0f;
+        scene->photoModel.position = ComputeInitialPhotoModelPosition(
+            *scene,
+            scene->photoModel.bounds,
+            scene->photoModel.scale
+        );
+
+        TraceLog(
+            LOG_INFO,
+            TextFormat(
+                "Loaded photomodel: %s offset=(%.2f %.2f %.2f) scale=%.3f",
+                scene->photoModel.path.c_str(),
+                scene->photoModel.position.x,
+                scene->photoModel.position.y,
+                scene->photoModel.position.z,
+                scene->photoModel.scale
+            )
+        );
+    }
     bool LoadCollisionSidecar(const std::string& path, CollisionWorld* world) {
         std::ifstream input(path);
 
@@ -259,7 +337,7 @@ namespace {
     }
 }
 
-void LoadScene(Scene* scene, const char* modelPath) {
+void LoadScene(Scene* scene, const char* modelPath, const char* photoModelPath) {
     scene->modelPath = modelPath;
     scene->collisionSidecarPath = BuildCollisionSidecarPath(scene->modelPath);
     scene->externalCollisionLoaded = false;
@@ -375,6 +453,8 @@ void LoadScene(Scene* scene, const char* modelPath) {
             TextFormat("Model file '%s' not found. Using procedural city fallback.", modelPath)
         );
     }
+
+    LoadPhotoModel(scene, photoModelPath);
 }
 
 void DrawScene(const Scene& scene) {
@@ -398,11 +478,22 @@ void DrawScene(const Scene& scene) {
     }
 
     if (scene.modelLoaded) {
-        // Color WHITE laisse les matériaux OBJ/MTL faire leur travail.
-        DrawModel(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
+        if (scene.primaryModelVisible) {
+            // Color WHITE laisse les matériaux OBJ/MTL faire leur travail.
+            DrawModel(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
+        }
     }
     else {
         DrawProceduralCity(scene.proceduralCity);
+    }
+
+    if (scene.photoModel.loaded && scene.photoModel.visible) {
+        DrawModel(
+            scene.photoModel.model,
+            scene.photoModel.position,
+            scene.photoModel.scale,
+            WHITE
+        );
     }
 }
 
@@ -410,12 +501,28 @@ void DrawSceneDebug(
     const Scene& scene,
     const SceneDebugRenderOptions& options
 ) {
-    if (scene.modelLoaded && options.showWireframe) {
+    if (scene.modelLoaded && scene.primaryModelVisible && options.showWireframe) {
         DrawModelWires(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, Fade(BLACK, 0.22f));
     }
 
-    if (scene.modelLoaded && scene.modelStats.hasBounds && options.showBounds) {
+    if (scene.photoModel.loaded && scene.photoModel.visible && options.showWireframe) {
+        DrawModelWires(
+            scene.photoModel.model,
+            scene.photoModel.position,
+            scene.photoModel.scale,
+            Fade(MAROON, 0.32f)
+        );
+    }
+
+    if (scene.modelLoaded && scene.primaryModelVisible && scene.modelStats.hasBounds && options.showBounds) {
         DrawBoundingBox(scene.modelStats.bounds, BLUE);
+    }
+
+    if (scene.photoModel.loaded && scene.photoModel.visible && scene.photoModel.hasBounds && options.showBounds) {
+        DrawBoundingBox(
+            TransformBounds(scene.photoModel.bounds, scene.photoModel.position, scene.photoModel.scale),
+            ORANGE
+        );
     }
 
     if (options.showGroundHeightfield) {
@@ -427,13 +534,71 @@ void DrawSceneDebug(
     }
 }
 
+void UpdateScenePhotoModelControls(Scene* scene) {
+    if (IsKeyPressed(KEY_P) && scene->photoModel.loaded) {
+        scene->photoModel.visible = !scene->photoModel.visible;
+    }
+
+    if (IsKeyPressed(KEY_X) && scene->modelLoaded) {
+        scene->primaryModelVisible = !scene->primaryModelVisible;
+    }
+
+    if (!scene->photoModel.loaded) {
+        return;
+    }
+
+    const float dt = GetFrameTime();
+    const float moveSpeed = (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) ? 25.0f : 4.0f;
+    const float step = moveSpeed * dt;
+
+    if (IsKeyDown(KEY_J)) {
+        scene->photoModel.position.x -= step;
+    }
+
+    if (IsKeyDown(KEY_L)) {
+        scene->photoModel.position.x += step;
+    }
+
+    if (IsKeyDown(KEY_I)) {
+        scene->photoModel.position.z -= step;
+    }
+
+    if (IsKeyDown(KEY_K)) {
+        scene->photoModel.position.z += step;
+    }
+
+    if (IsKeyDown(KEY_U)) {
+        scene->photoModel.position.y += step;
+    }
+
+    if (IsKeyDown(KEY_O)) {
+        scene->photoModel.position.y -= step;
+    }
+
+    if (IsKeyDown(KEY_EQUAL) || IsKeyDown(KEY_KP_ADD)) {
+        scene->photoModel.scale += dt * 0.08f;
+    }
+
+    if (IsKeyDown(KEY_MINUS) || IsKeyDown(KEY_KP_SUBTRACT)) {
+        scene->photoModel.scale -= dt * 0.08f;
+    }
+
+    scene->photoModel.scale = std::max(0.05f, scene->photoModel.scale);
+}
 void UnloadScene(Scene* scene) {
     if (scene->modelLoaded) {
         UnloadModel(scene->model);
         scene->modelLoaded = false;
     }
 
+    if (scene->photoModel.loaded) {
+        UnloadModel(scene->photoModel.model);
+        scene->photoModel.loaded = false;
+        scene->photoModel.visible = false;
+    }
+
     scene->modelStats = {};
+    scene->photoModel = {};
     scene->collisionWorld.solidBoxes.clear();
     scene->collisionWorld.solidSegments.clear();
 }
@@ -464,6 +629,7 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
 
 
 
