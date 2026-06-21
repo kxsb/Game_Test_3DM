@@ -3,6 +3,7 @@
 #include "ModelUtils.h"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -21,6 +22,28 @@ namespace {
         return world;
     }
 
+    float EstimateWalkGroundY(const BoundingBox& bounds) {
+        // Pour les tuiles DXF, on normalise déjà l'altitude minimale à Y=0.
+        // En attendant un vrai terrain, le niveau de marche doit rester à 0.
+        (void)bounds;
+        return 0.0f;
+    }
+
+    SceneGroundPlane BuildGroundPlaneFromBounds(const BoundingBox& bounds, float y) {
+        SceneGroundPlane plane = {};
+        plane.enabled = true;
+        plane.y = y;
+
+        const float padding = 20.0f;
+
+        plane.minX = bounds.min.x - padding;
+        plane.maxX = bounds.max.x + padding;
+        plane.minZ = bounds.min.z - padding;
+        plane.maxZ = bounds.max.z + padding;
+
+        return plane;
+    }
+
     SceneModelStats ComputeSceneModelStats(Model* model) {
         SceneModelStats stats = {};
 
@@ -35,6 +58,7 @@ namespace {
 
         stats.bounds = ComputeModelBoundingBox(model);
         stats.hasBounds = true;
+        stats.estimatedWalkGroundY = EstimateWalkGroundY(stats.bounds);
 
         return stats;
     }
@@ -74,7 +98,6 @@ namespace {
                 continue;
             }
 
-            // Robustesse Windows/fr-FR : accepte les nombres en virgule décimale.
             std::replace(line.begin(), line.end(), ',', '.');
 
             std::istringstream iss(line);
@@ -112,12 +135,78 @@ namespace {
 
         return loadedBoxes > 0;
     }
+
+    float ComputeGridSpacing(float extent) {
+        if (extent > 300.0f) {
+            return 10.0f;
+        }
+
+        if (extent > 120.0f) {
+            return 5.0f;
+        }
+
+        return AppConfig::GridSpacing;
+    }
+
+    void DrawGroundGridAtY(float y, float minX, float maxX, float minZ, float maxZ, float spacing) {
+        const float startX = std::floor(minX / spacing) * spacing;
+        const float endX = std::ceil(maxX / spacing) * spacing;
+
+        const float startZ = std::floor(minZ / spacing) * spacing;
+        const float endZ = std::ceil(maxZ / spacing) * spacing;
+
+        for (float x = startX; x <= endX + 0.001f; x += spacing) {
+            const bool isAxis = std::fabs(x) < 0.001f;
+            const Color color = isAxis ? BLUE : Fade(DARKGRAY, 0.28f);
+
+            DrawLine3D(
+                { x, y + 0.01f, startZ },
+                { x, y + 0.01f, endZ },
+                color
+            );
+        }
+
+        for (float z = startZ; z <= endZ + 0.001f; z += spacing) {
+            const bool isAxis = std::fabs(z) < 0.001f;
+            const Color color = isAxis ? BLUE : Fade(DARKGRAY, 0.28f);
+
+            DrawLine3D(
+                { startX, y + 0.01f, z },
+                { endX, y + 0.01f, z },
+                color
+            );
+        }
+    }
+
+    void DrawGroundPlane(const SceneGroundPlane& plane) {
+        const float centerX = (plane.minX + plane.maxX) * 0.5f;
+        const float centerZ = (plane.minZ + plane.maxZ) * 0.5f;
+        const float sizeX = plane.maxX - plane.minX;
+        const float sizeZ = plane.maxZ - plane.minZ;
+
+        DrawCube(
+            { centerX, plane.y - 0.03f, centerZ },
+            sizeX,
+            0.04f,
+            sizeZ,
+            Color{ 205, 210, 205, 255 }
+        );
+
+        DrawCubeWires(
+            { centerX, plane.y - 0.02f, centerZ },
+            sizeX,
+            0.04f,
+            sizeZ,
+            Fade(DARKGREEN, 0.55f)
+        );
+    }
 }
 
 void LoadScene(Scene* scene, const char* modelPath) {
     scene->modelPath = modelPath;
     scene->collisionSidecarPath = BuildCollisionSidecarPath(scene->modelPath);
     scene->externalCollisionLoaded = false;
+    scene->groundPlane = {};
 
     scene->proceduralCity = CreateProceduralCity();
     scene->collisionWorld = BuildCollisionWorldFromProceduralCity(scene->proceduralCity);
@@ -126,10 +215,13 @@ void LoadScene(Scene* scene, const char* modelPath) {
     if (FileExists(modelPath)) {
         scene->model = LoadModel(modelPath);
         NormalizeModelToGround(&scene->model, AppConfig::GroundY);
+
         scene->modelStats = ComputeSceneModelStats(&scene->model);
         scene->modelLoaded = true;
 
-        scene->collisionWorld.groundY = AppConfig::GroundY;
+        scene->collisionWorld.groundY = scene->modelStats.estimatedWalkGroundY;
+        scene->groundPlane = BuildGroundPlaneFromBounds(scene->modelStats.bounds, scene->collisionWorld.groundY);
+
         scene->externalCollisionLoaded = LoadCollisionSidecar(scene->collisionSidecarPath, &scene->collisionWorld);
 
         if (!scene->externalCollisionLoaded) {
@@ -145,6 +237,14 @@ void LoadScene(Scene* scene, const char* modelPath) {
                 scene->modelStats.materialCount,
                 scene->modelStats.vertexCount,
                 scene->modelStats.triangleCount
+            )
+        );
+
+        TraceLog(
+            LOG_INFO,
+            TextFormat(
+                "Walk ground: %.2f",
+                scene->collisionWorld.groundY
             )
         );
 
@@ -173,10 +273,27 @@ void LoadScene(Scene* scene, const char* modelPath) {
 }
 
 void DrawScene(const Scene& scene) {
-    DrawGrid(AppConfig::GridSlices, AppConfig::GridSpacing);
+    if (scene.groundPlane.enabled) {
+        const float extentX = scene.groundPlane.maxX - scene.groundPlane.minX;
+        const float extentZ = scene.groundPlane.maxZ - scene.groundPlane.minZ;
+        const float spacing = ComputeGridSpacing(std::max(extentX, extentZ));
+
+        DrawGroundPlane(scene.groundPlane);
+        DrawGroundGridAtY(
+            scene.groundPlane.y,
+            scene.groundPlane.minX,
+            scene.groundPlane.maxX,
+            scene.groundPlane.minZ,
+            scene.groundPlane.maxZ,
+            spacing
+        );
+    }
+    else {
+        DrawGrid(AppConfig::GridSlices, AppConfig::GridSpacing);
+    }
 
     if (scene.modelLoaded) {
-        DrawModel(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, LIGHTGRAY);
+        DrawModel(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, Color{ 185, 185, 185, 255 });
     }
     else {
         DrawProceduralCity(scene.proceduralCity);
@@ -199,4 +316,25 @@ void UnloadScene(Scene* scene) {
 
     scene->modelStats = {};
     scene->collisionWorld.solidBoxes.clear();
+}
+
+void AdjustSceneGround(Scene* scene, float deltaY) {
+    scene->collisionWorld.groundY += deltaY;
+
+    if (scene->groundPlane.enabled) {
+        scene->groundPlane.y = scene->collisionWorld.groundY;
+    }
+}
+
+void ResetSceneGroundToEstimated(Scene* scene) {
+    if (scene->modelLoaded && scene->modelStats.hasBounds) {
+        scene->collisionWorld.groundY = scene->modelStats.estimatedWalkGroundY;
+    }
+    else {
+        scene->collisionWorld.groundY = AppConfig::GroundY;
+    }
+
+    if (scene->groundPlane.enabled) {
+        scene->groundPlane.y = scene->collisionWorld.groundY;
+    }
 }

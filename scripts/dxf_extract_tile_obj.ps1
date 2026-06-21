@@ -347,36 +347,6 @@ $lines.Add("o dxf_tile")
 $vertexIndex = 1
 $triangleCount = 0
 
-# Ground slab for gameplay testing.
-# The source DXF contains building geometry, but no explicit street/terrain layer.
-# We add a simple visual ground plane matching the extracted tile.
-$groundPadding = 20.0
-
-$groundMinX = $tileMinX - $CenterX - $groundPadding
-$groundMaxX = $tileMaxX - $CenterX + $groundPadding
-$groundMinZ = $tileMinY - $CenterY - $groundPadding
-$groundMaxZ = $tileMaxY - $CenterY + $groundPadding
-
-$groundVertex0 = $vertexIndex
-$lines.Add("v $(Format-Float $groundMinX) 0 $(Format-Float $groundMinZ)")
-$vertexIndex++
-
-$groundVertex1 = $vertexIndex
-$lines.Add("v $(Format-Float $groundMaxX) 0 $(Format-Float $groundMinZ)")
-$vertexIndex++
-
-$groundVertex2 = $vertexIndex
-$lines.Add("v $(Format-Float $groundMaxX) 0 $(Format-Float $groundMaxZ)")
-$vertexIndex++
-
-$groundVertex3 = $vertexIndex
-$lines.Add("v $(Format-Float $groundMinX) 0 $(Format-Float $groundMaxZ)")
-$vertexIndex++
-
-$lines.Add("f $groundVertex0 $groundVertex1 $groundVertex2")
-$lines.Add("f $groundVertex0 $groundVertex2 $groundVertex3")
-$triangleCount += 2
-
 foreach ($face in $selectedFaces) {
     $i0 = $vertexIndex
     Add-ObjVertex $lines $face.X0 $face.Y0 $face.Z0 $CenterX $CenterY $groundZ
