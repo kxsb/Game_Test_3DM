@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$Path,
 
@@ -9,6 +9,8 @@ param(
     [double]$Depth = 250,
 
     [int]$MaxFaces = 50000,
+
+    [double]$GroundCellSize = 6.0,
 
     [double]$CenterX = [double]::NaN,
 
@@ -381,9 +383,101 @@ foreach ($face in $selectedFaces) {
 
 Set-Content -Path $OutputPath -Value $lines -Encoding ASCII
 
+$GroundOutputPath = [System.IO.Path]::ChangeExtension($OutputPath, ".ground.txt")
+$GroundMinX = -($Width / 2.0)
+$GroundMinZ = -($Depth / 2.0)
+$GroundWidthCells = [Math]::Max(1, [int][Math]::Ceiling($Width / $GroundCellSize))
+$GroundDepthCells = [Math]::Max(1, [int][Math]::Ceiling($Depth / $GroundCellSize))
+
+$script:GroundSamples = @{}
+
+function Add-GroundSample {
+    param(
+        [double]$SourceX,
+        [double]$SourceY,
+        [double]$SourceZ
+    )
+
+    $gameX = $SourceX - $CenterX
+    $gameY = $SourceZ - $groundZ
+    $gameZ = $SourceY - $CenterY
+
+    if ($gameY -lt -0.50) { return }
+    if ($gameY -gt 3.00) { return }
+
+    $ix = [int][Math]::Floor(($gameX - $GroundMinX) / $GroundCellSize)
+    $iz = [int][Math]::Floor(($gameZ - $GroundMinZ) / $GroundCellSize)
+
+    if ($ix -lt 0 -or $ix -ge $GroundWidthCells -or $iz -lt 0 -or $iz -ge $GroundDepthCells) {
+        return
+    }
+
+    $key = "$ix,$iz"
+
+    if (-not $script:GroundSamples.ContainsKey($key)) {
+        $script:GroundSamples[$key] = New-Object System.Collections.Generic.List[double]
+    }
+
+    $script:GroundSamples[$key].Add($gameY)
+}
+
+foreach ($face in $selectedFaces) {
+    $faceMinAlt = Min4 $face.Z0 $face.Z1 $face.Z2 $face.Z3
+    $faceMaxAlt = Max4 $face.Z0 $face.Z1 $face.Z2 $face.Z3
+    $verticalSpread = $faceMaxAlt - $faceMinAlt
+
+    # Sol candidat : bas et pas trop accidenté verticalement.
+    # Les façades et les toits hauts sont rejetés ici.
+    if ($verticalSpread -gt 0.90) {
+        continue
+    }
+
+    if (($faceMinAlt - $groundZ) -gt 3.00) {
+        continue
+    }
+
+    Add-GroundSample $face.X0 $face.Y0 $face.Z0
+    Add-GroundSample $face.X1 $face.Y1 $face.Z1
+    Add-GroundSample $face.X2 $face.Y2 $face.Z2
+    Add-GroundSample $face.X3 $face.Y3 $face.Z3
+
+    $cx = ($face.X0 + $face.X1 + $face.X2 + $face.X3) / 4.0
+    $cy = ($face.Y0 + $face.Y1 + $face.Y2 + $face.Y3) / 4.0
+    $cz = ($face.Z0 + $face.Z1 + $face.Z2 + $face.Z3) / 4.0
+    Add-GroundSample $cx $cy $cz
+}
+
+$groundLines = New-Object System.Collections.Generic.List[string]
+$groundLines.Add("# Montpellier Game ground sidecar generated from DXF tile")
+$groundLines.Add("# Format:")
+$groundLines.Add("# grid minX minZ cellSize width depth fallbackY")
+$groundLines.Add("# cell ix iz height sampleCount")
+$groundLines.Add("# Source: $ResolvedPath")
+$groundLines.Add("# OBJ: $OutputPath")
+$groundLines.Add("grid $(Format-Float $GroundMinX) $(Format-Float $GroundMinZ) $(Format-Float $GroundCellSize) $GroundWidthCells $GroundDepthCells 0")
+
+foreach ($key in ($script:GroundSamples.Keys | Sort-Object)) {
+    $parts = $key.Split(",")
+    $values = $script:GroundSamples[$key]
+
+    if ($values.Count -eq 0) {
+        continue
+    }
+
+    $sum = 0.0
+    foreach ($v in $values) {
+        $sum += $v
+    }
+
+    $avg = $sum / [double]$values.Count
+    $groundLines.Add("cell $($parts[0]) $($parts[1]) $(Format-Float $avg) $($values.Count)")
+}
+
+Set-Content -Path $GroundOutputPath -Value $groundLines -Encoding ASCII
+
 Write-Host ""
 Write-Host "=== DXF TILE OBJ ==="
-Write-Host "Output : $OutputPath"
+Write-Host "Output : $OutputPath"`nWrite-Host "Ground sidecar : $GroundOutputPath"`nWrite-Host "Ground sampled cells : $($script:GroundSamples.Count)"
 Write-Host "Selected faces : $($selectedFaces.Count)"
 Write-Host "Vertices : $($vertexIndex - 1)"
 Write-Host "Triangles : $triangleCount"

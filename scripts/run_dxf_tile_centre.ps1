@@ -66,11 +66,12 @@ else {
 }
 
 $CollisionPath = [System.IO.Path]::ChangeExtension($OutputPath, ".collisions.txt")
+$GroundPath = [System.IO.Path]::ChangeExtension($OutputPath, ".ground.txt")
 
 Write-Host "=== DXF TILE CENTRE ==="
 Write-Host "DXF : $DxfPath"
 Write-Host "OBJ : $OutputPath"
-Write-Host "Collisions : $CollisionPath"
+Write-Host "Collisions : $CollisionPath"`nWrite-Host "Ground : $GroundPath"
 Write-Host "Width : $Width"
 Write-Host "Depth : $Depth"
 Write-Host "MaxFaces : $MaxFaces"

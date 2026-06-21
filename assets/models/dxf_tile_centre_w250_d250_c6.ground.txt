@@ -1,0 +1,7 @@
+# Montpellier Game ground sidecar generated from DXF tile
+# Format:
+# grid minX minZ cellSize width depth fallbackY
+# cell ix iz height sampleCount
+# Source: C:\Users\micka\Desktop\d?veloppement\montpellier_game\VilleMTP_MTP_Modele3D\Centre_BATIMENTS_2016.dxf
+# OBJ: assets\models\dxf_tile_centre_w250_d250_c6.obj
+grid -125 -125 6 42 42 0

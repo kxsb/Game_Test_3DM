@@ -77,6 +77,17 @@ namespace {
         return modelPath.substr(0, dotPos) + ".collisions.txt";
     }
 
+    std::string BuildGroundSidecarPath(const std::string& modelPath) {
+        const size_t slashPos = modelPath.find_last_of("/\\");
+        const size_t dotPos = modelPath.find_last_of('.');
+
+        if (dotPos == std::string::npos || (slashPos != std::string::npos && dotPos < slashPos)) {
+            return modelPath + ".ground.txt";
+        }
+
+        return modelPath.substr(0, dotPos) + ".ground.txt";
+    }
+
     bool LoadCollisionSidecar(const std::string& path, CollisionWorld* world) {
         std::ifstream input(path);
 
@@ -225,12 +236,31 @@ void LoadScene(Scene* scene, const char* modelPath) {
         scene->collisionWorld.groundY = scene->modelStats.estimatedWalkGroundY;
         scene->collisionWorld.maxWalkSlopeRatio = AppConfig::MaxWalkSlopeRatio;
         scene->collisionWorld.maxWalkStepHeight = AppConfig::MaxWalkStepHeight;
-        scene->collisionWorld.groundHeightfield = BuildGroundHeightfieldFromModel(
-            &scene->model,
-            scene->modelStats.bounds,
-            scene->collisionWorld.groundY,
-            AppConfig::GroundHeightfieldCellSize
-        );
+
+        const std::string groundSidecarPath = BuildGroundSidecarPath(scene->modelPath);
+
+        if (FileExists(groundSidecarPath.c_str())) {
+            scene->collisionWorld.groundHeightfield = LoadGroundHeightfieldFromFile(
+                groundSidecarPath.c_str(),
+                scene->collisionWorld.groundY
+            );
+
+            if (scene->collisionWorld.groundHeightfield.enabled) {
+                TraceLog(LOG_INFO, TextFormat("Loaded ground sidecar: %s", groundSidecarPath.c_str()));
+            }
+            else {
+                TraceLog(LOG_WARNING, TextFormat("Ground sidecar unusable: %s", groundSidecarPath.c_str()));
+            }
+        }
+
+        if (!scene->collisionWorld.groundHeightfield.enabled) {
+            scene->collisionWorld.groundHeightfield = BuildGroundHeightfieldFromModel(
+                &scene->model,
+                scene->modelStats.bounds,
+                scene->collisionWorld.groundY,
+                AppConfig::GroundHeightfieldCellSize
+            );
+        }
 
         scene->groundPlane = BuildGroundPlaneFromBounds(scene->modelStats.bounds, scene->collisionWorld.groundY);
 
@@ -376,6 +406,8 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
+
 
 
 

@@ -33,6 +33,11 @@ GroundHeightfield BuildGroundHeightfieldFromModel(
     float cellSize
 );
 
+GroundHeightfield LoadGroundHeightfieldFromFile(
+    const char* path,
+    float fallbackY
+);
+
 float SampleGroundHeightAt(
     const GroundHeightfield& heightfield,
     float fallbackY,
@@ -48,3 +53,4 @@ void OffsetGroundHeightfield(
 void DrawGroundHeightfieldDebug(
     const GroundHeightfield& heightfield
 );
+

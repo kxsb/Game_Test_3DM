@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cfloat>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 namespace {
     constexpr float MinWalkableNormalY = 0.78f;
@@ -222,6 +225,99 @@ namespace {
     }
 }
 
+
+GroundHeightfield LoadGroundHeightfieldFromFile(
+    const char* path,
+    float fallbackY
+) {
+    GroundHeightfield heightfield = {};
+
+    std::ifstream input(path);
+    if (!input.is_open()) {
+        return heightfield;
+    }
+
+    std::string line;
+    bool gridRead = false;
+
+    while (std::getline(input, line)) {
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        std::replace(line.begin(), line.end(), ',', '.');
+
+        std::istringstream iss(line);
+        std::string kind;
+        iss >> kind;
+
+        if (kind == "grid") {
+            iss >>
+                heightfield.minX >>
+                heightfield.minZ >>
+                heightfield.cellSize >>
+                heightfield.width >>
+                heightfield.depth >>
+                heightfield.minHeight;
+
+            if (iss.fail() || heightfield.width <= 0 || heightfield.depth <= 0 || heightfield.cellSize <= 0.0f) {
+                heightfield = {};
+                return heightfield;
+            }
+
+            heightfield.maxX = heightfield.minX + static_cast<float>(heightfield.width) * heightfield.cellSize;
+            heightfield.maxZ = heightfield.minZ + static_cast<float>(heightfield.depth) * heightfield.cellSize;
+
+            const int cellCount = heightfield.width * heightfield.depth;
+            heightfield.heights.assign(cellCount, fallbackY);
+            heightfield.hasData.assign(cellCount, 0);
+
+            gridRead = true;
+            continue;
+        }
+
+        if (kind == "cell" && gridRead) {
+            int x = 0;
+            int z = 0;
+            float height = fallbackY;
+            int sampleCount = 0;
+
+            iss >> x >> z >> height >> sampleCount;
+
+            if (iss.fail()) {
+                continue;
+            }
+
+            if (x < 0 || x >= heightfield.width || z < 0 || z >= heightfield.depth) {
+                continue;
+            }
+
+            const int index = CellIndex(heightfield, x, z);
+            heightfield.heights[index] = height;
+            heightfield.hasData[index] = 1;
+            heightfield.cellsWithSamples++;
+        }
+    }
+
+    heightfield.enabled = gridRead && heightfield.cellsWithSamples > 0;
+
+    FillMissingCellsFromNeighbors(&heightfield);
+
+    if (heightfield.enabled) {
+        const int cellCount = heightfield.width * heightfield.depth;
+
+        for (int i = 0; i < cellCount; ++i) {
+            if (!heightfield.hasData[i]) {
+                heightfield.heights[i] = fallbackY;
+                heightfield.hasData[i] = 1;
+            }
+        }
+
+        RecomputeHeightStats(&heightfield);
+    }
+
+    return heightfield;
+}
 GroundHeightfield BuildGroundHeightfieldFromModel(
     Model* model,
     const BoundingBox& bounds,
@@ -381,4 +477,5 @@ void DrawGroundHeightfieldDebug(
         }
     }
 }
+
 
