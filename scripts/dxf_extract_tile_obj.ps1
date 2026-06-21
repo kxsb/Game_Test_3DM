@@ -389,6 +389,13 @@ $GroundMinZ = -($Depth / 2.0)
 $GroundWidthCells = [Math]::Max(1, [int][Math]::Ceiling($Width / $GroundCellSize))
 $GroundDepthCells = [Math]::Max(1, [int][Math]::Ceiling($Depth / $GroundCellSize))
 
+# On ne dispose pas d'un vrai fichier "voirie / terrain".
+# Le DXF actuel est principalement un fichier bâtiments.
+# Donc on reconstruit un sol indicatif à partir des points bas des façades.
+$GroundMaxBaseHeightAboveMin = 20.0
+$GroundBaseVertexTolerance = 0.35
+$GroundGenerationMode = "base_vertices"
+
 $script:GroundSamples = @{}
 
 function Add-GroundSample {
@@ -403,7 +410,7 @@ function Add-GroundSample {
     $gameZ = $SourceY - $CenterY
 
     if ($gameY -lt -0.50) { return }
-    if ($gameY -gt 3.00) { return }
+    if ($gameY -gt $GroundMaxBaseHeightAboveMin) { return }
 
     $ix = [int][Math]::Floor(($gameX - $GroundMinX) / $GroundCellSize)
     $iz = [int][Math]::Floor(($gameZ - $GroundMinZ) / $GroundCellSize)
@@ -421,30 +428,73 @@ function Add-GroundSample {
     $script:GroundSamples[$key].Add($gameY)
 }
 
-foreach ($face in $selectedFaces) {
-    $faceMinAlt = Min4 $face.Z0 $face.Z1 $face.Z2 $face.Z3
-    $faceMaxAlt = Max4 $face.Z0 $face.Z1 $face.Z2 $face.Z3
+function Add-Face-Low-Vertices-To-Ground {
+    param($Face)
+
+    $faceMinAlt = Min4 $Face.Z0 $Face.Z1 $Face.Z2 $Face.Z3
+    $faceMaxAlt = Max4 $Face.Z0 $Face.Z1 $Face.Z2 $Face.Z3
+    $faceMinGameY = $faceMinAlt - $groundZ
     $verticalSpread = $faceMaxAlt - $faceMinAlt
 
-    # Sol candidat : bas et pas trop accidenté verticalement.
-    # Les façades et les toits hauts sont rejetés ici.
-    if ($verticalSpread -gt 0.90) {
-        continue
+    if ($faceMinGameY -lt -0.50) { return }
+    if ($faceMinGameY -gt $GroundMaxBaseHeightAboveMin) { return }
+
+    # 1) On récupère les vertices proches du bas de la face.
+    # Pour une façade verticale, ce sont généralement les deux points de pied.
+    if ([Math]::Abs($Face.Z0 - $faceMinAlt) -le $GroundBaseVertexTolerance) {
+        Add-GroundSample $Face.X0 $Face.Y0 $Face.Z0
     }
 
-    if (($faceMinAlt - $groundZ) -gt 3.00) {
-        continue
+    if ([Math]::Abs($Face.Z1 - $faceMinAlt) -le $GroundBaseVertexTolerance) {
+        Add-GroundSample $Face.X1 $Face.Y1 $Face.Z1
     }
 
-    Add-GroundSample $face.X0 $face.Y0 $face.Z0
-    Add-GroundSample $face.X1 $face.Y1 $face.Z1
-    Add-GroundSample $face.X2 $face.Y2 $face.Z2
-    Add-GroundSample $face.X3 $face.Y3 $face.Z3
+    if ([Math]::Abs($Face.Z2 - $faceMinAlt) -le $GroundBaseVertexTolerance) {
+        Add-GroundSample $Face.X2 $Face.Y2 $Face.Z2
+    }
 
-    $cx = ($face.X0 + $face.X1 + $face.X2 + $face.X3) / 4.0
-    $cy = ($face.Y0 + $face.Y1 + $face.Y2 + $face.Y3) / 4.0
-    $cz = ($face.Z0 + $face.Z1 + $face.Z2 + $face.Z3) / 4.0
-    Add-GroundSample $cx $cy $cz
+    if ([Math]::Abs($Face.Z3 - $faceMinAlt) -le $GroundBaseVertexTolerance) {
+        Add-GroundSample $Face.X3 $Face.Y3 $Face.Z3
+    }
+
+    # 2) Si la face est déjà basse et presque plane, on ajoute aussi le centre.
+    if ($verticalSpread -le 0.90) {
+        $cx = ($Face.X0 + $Face.X1 + $Face.X2 + $Face.X3) / 4.0
+        $cy = ($Face.Y0 + $Face.Y1 + $Face.Y2 + $Face.Y3) / 4.0
+        $cz = ($Face.Z0 + $Face.Z1 + $Face.Z2 + $Face.Z3) / 4.0
+        Add-GroundSample $cx $cy $cz
+    }
+}
+
+function Select-GroundHeight {
+    param($Values)
+
+    if ($Values.Count -eq 0) {
+        return 0.0
+    }
+
+    $sorted = @($Values | Sort-Object)
+    $index = [int][Math]::Floor(([Math]::Max(0, $sorted.Count - 1)) * 0.20)
+
+    return [double]$sorted[$index]
+}
+
+foreach ($face in $selectedFaces) {
+    Add-Face-Low-Vertices-To-Ground $face
+}
+
+# Si le DXF ne fournit vraiment aucun indice exploitable,
+# on génère un sol plat explicite plutôt qu'un sidecar vide.
+if ($script:GroundSamples.Count -eq 0) {
+    $GroundGenerationMode = "synthetic_flat_fallback"
+
+    for ($iz = 0; $iz -lt $GroundDepthCells; $iz++) {
+        for ($ix = 0; $ix -lt $GroundWidthCells; $ix++) {
+            $key = "$ix,$iz"
+            $script:GroundSamples[$key] = New-Object System.Collections.Generic.List[double]
+            $script:GroundSamples[$key].Add(0.0)
+        }
+    }
 }
 
 $groundLines = New-Object System.Collections.Generic.List[string]
@@ -454,6 +504,7 @@ $groundLines.Add("# grid minX minZ cellSize width depth fallbackY")
 $groundLines.Add("# cell ix iz height sampleCount")
 $groundLines.Add("# Source: $ResolvedPath")
 $groundLines.Add("# OBJ: $OutputPath")
+$groundLines.Add("# Mode: $GroundGenerationMode")
 $groundLines.Add("grid $(Format-Float $GroundMinX) $(Format-Float $GroundMinZ) $(Format-Float $GroundCellSize) $GroundWidthCells $GroundDepthCells 0")
 
 foreach ($key in ($script:GroundSamples.Keys | Sort-Object)) {
@@ -464,20 +515,18 @@ foreach ($key in ($script:GroundSamples.Keys | Sort-Object)) {
         continue
     }
 
-    $sum = 0.0
-    foreach ($v in $values) {
-        $sum += $v
-    }
-
-    $avg = $sum / [double]$values.Count
-    $groundLines.Add("cell $($parts[0]) $($parts[1]) $(Format-Float $avg) $($values.Count)")
+    $height = Select-GroundHeight $values
+    $groundLines.Add("cell $($parts[0]) $($parts[1]) $(Format-Float $height) $($values.Count)")
 }
 
 Set-Content -Path $GroundOutputPath -Value $groundLines -Encoding ASCII
 
 Write-Host ""
 Write-Host "=== DXF TILE OBJ ==="
-Write-Host "Output : $OutputPath"`nWrite-Host "Ground sidecar : $GroundOutputPath"`nWrite-Host "Ground sampled cells : $($script:GroundSamples.Count)"
+Write-Host "Output : $OutputPath"
+Write-Host "Ground sidecar : $GroundOutputPath"
+Write-Host "Ground sampled cells : $($script:GroundSamples.Count)"
+Write-Host "Ground mode : $GroundGenerationMode"
 Write-Host "Selected faces : $($selectedFaces.Count)"
 Write-Host "Vertices : $($vertexIndex - 1)"
 Write-Host "Triangles : $triangleCount"
@@ -489,3 +538,4 @@ Write-Host ("Selected bounds XYZ : min({0}, {1}, {2}) max({3}, {4}, {5})" -f `
     (Format-Float $SelectedMaxY), `
     (Format-Float $SelectedMaxZ)
 )
+
