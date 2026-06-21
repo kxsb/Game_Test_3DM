@@ -7,6 +7,10 @@
 #include <cfloat>
 
 namespace {
+    constexpr float MinWalkableNormalY = 0.78f;
+    constexpr float MaxTerrainHeightAboveFallback = 3.0f;
+    constexpr float MaxTriangleVerticalSpread = 0.90f;
+
     int CellIndex(const GroundHeightfield& heightfield, int x, int z) {
         return z * heightfield.width + x;
     }
@@ -66,6 +70,10 @@ namespace {
             return;
         }
 
+        if (point.y > fallbackY + MaxTerrainHeightAboveFallback) {
+            return;
+        }
+
         const int x = static_cast<int>(std::floor((point.x - heightfield.minX) / heightfield.cellSize));
         const int z = static_cast<int>(std::floor((point.z - heightfield.minZ) / heightfield.cellSize));
 
@@ -84,6 +92,35 @@ namespace {
         Vector3 b,
         Vector3 c
     ) {
+        const Vector3 ab = Vector3Subtract(b, a);
+        const Vector3 ac = Vector3Subtract(c, a);
+        const Vector3 normal = Vector3CrossProduct(ab, ac);
+        const float normalLength = Vector3Length(normal);
+
+        if (normalLength <= 0.0001f) {
+            return;
+        }
+
+        const float normalY = std::fabs(normal.y / normalLength);
+
+        // On refuse les façades et pans presque verticaux.
+        if (normalY < MinWalkableNormalY) {
+            return;
+        }
+
+        const float minY = std::min(a.y, std::min(b.y, c.y));
+        const float maxY = std::max(a.y, std::max(b.y, c.y));
+
+        // On refuse les triangles trop hauts : sinon les toits deviennent du "sol".
+        if (minY > fallbackY + MaxTerrainHeightAboveFallback) {
+            return;
+        }
+
+        // On refuse les triangles trop inclinés/bruités verticalement.
+        if ((maxY - minY) > MaxTriangleVerticalSpread) {
+            return;
+        }
+
         const Vector3 centroid = {
             (a.x + b.x + c.x) / 3.0f,
             (a.y + b.y + c.y) / 3.0f,
@@ -94,21 +131,6 @@ namespace {
         AddSample(heightfield, samples, fallbackY, b);
         AddSample(heightfield, samples, fallbackY, c);
         AddSample(heightfield, samples, fallbackY, centroid);
-
-        const Vector3 ab = Vector3Subtract(b, a);
-        const Vector3 ac = Vector3Subtract(c, a);
-        const Vector3 normal = Vector3CrossProduct(ab, ac);
-        const float normalLength = Vector3Length(normal);
-
-        if (normalLength > 0.0001f) {
-            const float normalY = normal.y / normalLength;
-
-            // Les surfaces très horizontales ajoutent un échantillon supplémentaire.
-            // Cela stabilise les dalles quand le DXF fournit de vrais morceaux de sol/toit.
-            if (std::fabs(normalY) > 0.65f) {
-                AddSample(heightfield, samples, fallbackY, centroid);
-            }
-        }
     }
 
     void FillMissingCellsFromNeighbors(GroundHeightfield* heightfield) {
@@ -359,3 +381,4 @@ void DrawGroundHeightfieldDebug(
         }
     }
 }
+
