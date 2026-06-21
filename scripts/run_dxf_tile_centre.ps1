@@ -1,44 +1,39 @@
-param(
+﻿param(
     [double]$Width = 250,
     [double]$Depth = 250,
     [int]$MaxFaces = 50000,
-    [string]$CenterX = "",
-    [string]$CenterY = ""
+    [string]$DxfPath = "..\VilleMTP_MTP_Modele3D\Centre_BATIMENTS_2016.dxf",
+    [string]$OutputPath = "assets\models\dxf_tile_centre.obj"
 )
 
 $ErrorActionPreference = "Stop"
-
-$DxfPath = "..\VilleMTP_MTP_Modele3D\Centre_BATIMENTS_2016.dxf"
-$OutputPath = "assets\models\dxf_tile_centre_${Width}x${Depth}.obj"
 
 if (-not (Test-Path $DxfPath)) {
     throw "DXF introuvable : $DxfPath"
 }
 
-$Args = @(
-    "-Path", $DxfPath,
-    "-OutputPath", $OutputPath,
-    "-Width", $Width,
-    "-Depth", $Depth,
-    "-MaxFaces", $MaxFaces
-)
+$ExtractScript = Join-Path $PSScriptRoot "dxf_extract_tile_obj.ps1"
+$RunScript = Join-Path $PSScriptRoot "run_windows.ps1"
 
-if ($CenterX -ne "") {
-    $Args += @("-CenterX", $CenterX)
+if (-not (Test-Path $ExtractScript)) {
+    throw "Script extracteur introuvable : $ExtractScript"
 }
 
-if ($CenterY -ne "") {
-    $Args += @("-CenterY", $CenterY)
+if (-not (Test-Path $RunScript)) {
+    throw "Script run_windows introuvable : $RunScript"
 }
 
-& "$PSScriptRoot\dxf_extract_tile_obj.ps1" @Args
+Write-Host "=== DXF TILE CENTRE ==="
+Write-Host "DXF : $DxfPath"
+Write-Host "Output : $OutputPath"
+Write-Host "Width : $Width"
+Write-Host "Depth : $Depth"
+Write-Host "MaxFaces : $MaxFaces"
 
-if (-not (Test-Path $OutputPath)) {
-    throw "OBJ non genere : $OutputPath"
+& $ExtractScript -Path $DxfPath -OutputPath $OutputPath -Width $Width -Depth $Depth -MaxFaces $MaxFaces
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Extraction tuile échouée."
 }
 
-$SystemRoot = $env:SystemRoot
-if (-not $SystemRoot) { $SystemRoot = "C:\Windows" }
-$PowerShellExe = Join-Path $SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-
-& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\run_windows.ps1" -ModelPath $OutputPath
+& $RunScript -ModelPath $OutputPath
