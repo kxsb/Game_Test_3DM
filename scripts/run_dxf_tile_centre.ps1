@@ -35,6 +35,7 @@ if (-not (Test-Path $DxfPath)) {
 
 $ExtractScript = Join-Path $PSScriptRoot "dxf_extract_tile_obj.ps1"
 $CollisionScript = Join-Path $PSScriptRoot "generate_collision_sidecar_from_obj.ps1"
+$MaterialScript = Join-Path $PSScriptRoot "apply_tile_materials.ps1"
 $RunScript = Join-Path $PSScriptRoot "run_windows.ps1"
 
 if (-not (Test-Path $ExtractScript)) {
@@ -51,6 +52,17 @@ if (-not $OutputPath) {
     $cellSlug = ConvertTo-FileNumber $CollisionCellSize
 
     $OutputPath = "assets\models\dxf_tile_centre_w${widthSlug}_d${depthSlug}_c${cellSlug}.obj"
+}
+
+if (Test-Path $MaterialScript) {
+    Write-Host ""
+    Write-Host "=== APPLY TILE MATERIALS ==="
+    & $MaterialScript -Path $OutputPath
+}
+else {
+    Write-Host ""
+    Write-Host "=== APPLY TILE MATERIALS ==="
+    Write-Host "Material script missing, skipping."
 }
 
 $CollisionPath = [System.IO.Path]::ChangeExtension($OutputPath, ".collisions.txt")
