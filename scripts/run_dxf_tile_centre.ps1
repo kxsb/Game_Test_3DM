@@ -50,8 +50,10 @@ if (-not [double]::IsNaN($CenterY)) {
 
 & $ExtractScript @extractArgs
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Tile extraction failed."
+if (-not (Test-Path $OutputPath)) {
+    throw "Tile extraction did not create expected OBJ: $OutputPath"
 }
 
+Write-Host ""
+Write-Host "=== RUN GENERATED TILE ==="
 & $RunScript -ModelPath $OutputPath
