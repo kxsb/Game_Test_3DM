@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "GroundHeightfield.h"
 #include "raylib.h"
 
 #include <vector>
@@ -11,6 +12,12 @@ struct CollisionBox {
 
 struct CollisionWorld {
     float groundY = 0.0f;
+
+    GroundHeightfield groundHeightfield;
+
+    float maxWalkSlopeRatio = 0.75f;
+    float maxWalkStepHeight = 0.65f;
+
     std::vector<CollisionBox> solidBoxes;
 };
 
@@ -21,6 +28,12 @@ struct PlayerCollisionBody {
 };
 
 CollisionBox MakeCollisionBox(Vector3 center, Vector3 size);
+
+float GetCollisionGroundYAtPosition(
+    const CollisionWorld& world,
+    float x,
+    float z
+);
 
 bool IsPlayerCollidingAtPosition(
     Vector3 eyePosition,
@@ -36,3 +49,6 @@ Vector3 ResolveWalkMovement(
 );
 
 void DrawCollisionWorldDebug(const CollisionWorld& world);
+
+
+

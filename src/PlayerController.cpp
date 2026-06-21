@@ -50,11 +50,11 @@ namespace {
     }
 
     float WalkEyeY(const PlayerControllerState* player, const CollisionWorld& world) {
-        return world.groundY + player->walkEyeHeight;
+        return GetCollisionGroundYAtPosition(world, player->position.x, player->position.z) + player->walkEyeHeight;
     }
 
     float FlyMinY(const PlayerControllerState* player, const CollisionWorld& world) {
-        return world.groundY + player->flyMinEyeHeight;
+        return GetCollisionGroundYAtPosition(world, player->position.x, player->position.z) + player->flyMinEyeHeight;
     }
 
     PlayerCollisionBody CreatePlayerBody(const PlayerControllerState* player) {
@@ -244,3 +244,4 @@ void ApplyPlayerToCamera(const PlayerControllerState& player, Camera3D* camera) 
     camera->position = player.position;
     camera->target = Vector3Add(player.position, ForwardFromAngles(player.yaw, player.pitch));
 }
+

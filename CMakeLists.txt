@@ -29,6 +29,7 @@ add_executable(montpellier
   src/ProceduralCity.cpp
   src/PlayerController.cpp
   src/Collision.cpp
+  src/GroundHeightfield.cpp
   src/Hud.cpp
   src/Scene.cpp
   src/Game.cpp
@@ -46,6 +47,7 @@ add_custom_command(TARGET montpellier POST_BUILD
           ${CMAKE_SOURCE_DIR}/assets
           $<TARGET_FILE_DIR:montpellier>/assets
 )
+
 
 
 

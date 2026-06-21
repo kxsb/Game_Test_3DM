@@ -1,6 +1,7 @@
 ﻿#include "Scene.h"
 #include "AppConfig.h"
 #include "ModelUtils.h"
+#include "GroundHeightfield.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,6 +13,8 @@ namespace {
     CollisionWorld BuildCollisionWorldFromProceduralCity(const ProceduralCity& city) {
         CollisionWorld world = {};
         world.groundY = AppConfig::GroundY;
+        world.maxWalkSlopeRatio = AppConfig::MaxWalkSlopeRatio;
+        world.maxWalkStepHeight = AppConfig::MaxWalkStepHeight;
 
         world.solidBoxes.reserve(city.buildings.size());
 
@@ -220,6 +223,15 @@ void LoadScene(Scene* scene, const char* modelPath) {
         scene->modelLoaded = true;
 
         scene->collisionWorld.groundY = scene->modelStats.estimatedWalkGroundY;
+        scene->collisionWorld.maxWalkSlopeRatio = AppConfig::MaxWalkSlopeRatio;
+        scene->collisionWorld.maxWalkStepHeight = AppConfig::MaxWalkStepHeight;
+        scene->collisionWorld.groundHeightfield = BuildGroundHeightfieldFromModel(
+            &scene->model,
+            scene->modelStats.bounds,
+            scene->collisionWorld.groundY,
+            AppConfig::GroundHeightfieldCellSize
+        );
+
         scene->groundPlane = BuildGroundPlaneFromBounds(scene->modelStats.bounds, scene->collisionWorld.groundY);
 
         scene->externalCollisionLoaded = LoadCollisionSidecar(scene->collisionSidecarPath, &scene->collisionWorld);
@@ -247,6 +259,25 @@ void LoadScene(Scene* scene, const char* modelPath) {
                 scene->collisionWorld.groundY
             )
         );
+
+        if (scene->collisionWorld.groundHeightfield.enabled) {
+            TraceLog(
+                LOG_INFO,
+                TextFormat(
+                    "Ground heightfield: %dx%d cell=%.2f sampled=%d filled=%d height=[%.2f %.2f]",
+                    scene->collisionWorld.groundHeightfield.width,
+                    scene->collisionWorld.groundHeightfield.depth,
+                    scene->collisionWorld.groundHeightfield.cellSize,
+                    scene->collisionWorld.groundHeightfield.cellsWithSamples,
+                    scene->collisionWorld.groundHeightfield.cellsFilledFromNeighbors,
+                    scene->collisionWorld.groundHeightfield.minHeight,
+                    scene->collisionWorld.groundHeightfield.maxHeight
+                )
+            );
+        }
+        else {
+            TraceLog(LOG_WARNING, "Ground heightfield: disabled, using flat ground fallback");
+        }
 
         if (scene->externalCollisionLoaded) {
             TraceLog(
@@ -305,6 +336,7 @@ void DrawSceneDebug(const Scene& scene) {
         DrawBoundingBox(scene.modelStats.bounds, BLUE);
     }
 
+    DrawGroundHeightfieldDebug(scene.collisionWorld.groundHeightfield);
     DrawCollisionWorldDebug(scene.collisionWorld);
 }
 
@@ -320,6 +352,7 @@ void UnloadScene(Scene* scene) {
 
 void AdjustSceneGround(Scene* scene, float deltaY) {
     scene->collisionWorld.groundY += deltaY;
+    OffsetGroundHeightfield(&scene->collisionWorld.groundHeightfield, deltaY);
 
     if (scene->groundPlane.enabled) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
@@ -327,6 +360,8 @@ void AdjustSceneGround(Scene* scene, float deltaY) {
 }
 
 void ResetSceneGroundToEstimated(Scene* scene) {
+    const float previousGroundY = scene->collisionWorld.groundY;
+
     if (scene->modelLoaded && scene->modelStats.hasBounds) {
         scene->collisionWorld.groundY = scene->modelStats.estimatedWalkGroundY;
     }
@@ -334,7 +369,16 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->collisionWorld.groundY = AppConfig::GroundY;
     }
 
+    const float deltaY = scene->collisionWorld.groundY - previousGroundY;
+    OffsetGroundHeightfield(&scene->collisionWorld.groundHeightfield, deltaY);
+
     if (scene->groundPlane.enabled) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
+
+
+
+
+

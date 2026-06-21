@@ -43,6 +43,37 @@ namespace {
         return playerMaxY >= boxMinY && playerMinY <= boxMaxY;
     }
 
+    float WalkEyeYAtPosition(
+        Vector3 eyePosition,
+        const PlayerCollisionBody& body,
+        const CollisionWorld& world
+    ) {
+        return GetCollisionGroundYAtPosition(world, eyePosition.x, eyePosition.z) + body.eyeHeight;
+    }
+
+    bool IsGroundTransitionWalkable(
+        Vector3 fromEyePosition,
+        Vector3 toEyePosition,
+        const CollisionWorld& world
+    ) {
+        const float dx = toEyePosition.x - fromEyePosition.x;
+        const float dz = toEyePosition.z - fromEyePosition.z;
+        const float horizontalDistance = std::sqrt(dx * dx + dz * dz);
+
+        if (horizontalDistance <= 0.0001f) {
+            return true;
+        }
+
+        const float deltaY = toEyePosition.y - fromEyePosition.y;
+
+        if (std::fabs(deltaY) > world.maxWalkStepHeight) {
+            return false;
+        }
+
+        const float slopeRatio = std::fabs(deltaY) / horizontalDistance;
+        return slopeRatio <= world.maxWalkSlopeRatio;
+    }
+
     Vector3 ResolveWalkMovementStep(
         Vector3 eyePosition,
         Vector3 movement,
@@ -50,21 +81,31 @@ namespace {
         const CollisionWorld& world
     ) {
         Vector3 resolved = eyePosition;
+        resolved.y = WalkEyeYAtPosition(resolved, body, world);
 
         Vector3 tryX = resolved;
         tryX.x += movement.x;
+        tryX.y = WalkEyeYAtPosition(tryX, body, world);
 
-        if (!IsPlayerCollidingAtPosition(tryX, body, world)) {
-            resolved.x = tryX.x;
+        if (
+            IsGroundTransitionWalkable(resolved, tryX, world) &&
+            !IsPlayerCollidingAtPosition(tryX, body, world)
+        ) {
+            resolved = tryX;
         }
 
         Vector3 tryZ = resolved;
         tryZ.z += movement.z;
+        tryZ.y = WalkEyeYAtPosition(tryZ, body, world);
 
-        if (!IsPlayerCollidingAtPosition(tryZ, body, world)) {
-            resolved.z = tryZ.z;
+        if (
+            IsGroundTransitionWalkable(resolved, tryZ, world) &&
+            !IsPlayerCollidingAtPosition(tryZ, body, world)
+        ) {
+            resolved = tryZ;
         }
 
+        resolved.y = WalkEyeYAtPosition(resolved, body, world);
         return resolved;
     }
 }
@@ -74,6 +115,14 @@ CollisionBox MakeCollisionBox(Vector3 center, Vector3 size) {
     box.center = center;
     box.size = size;
     return box;
+}
+
+float GetCollisionGroundYAtPosition(
+    const CollisionWorld& world,
+    float x,
+    float z
+) {
+    return SampleGroundHeightAt(world.groundHeightfield, world.groundY, x, z);
 }
 
 bool IsPlayerCollidingAtPosition(
@@ -126,3 +175,6 @@ void DrawCollisionWorldDebug(const CollisionWorld& world) {
         DrawCubeWiresV(box.center, box.size, RED);
     }
 }
+
+
+

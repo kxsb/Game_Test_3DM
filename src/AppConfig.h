@@ -7,7 +7,7 @@ namespace AppConfig {
     constexpr int ScreenHeight = 720;
 
     constexpr const char* WindowTitle = "Montpellier 3D Prototype";
-    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1H-FIX1";
+    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1I-HEIGHTFIELD";
     constexpr const char* DefaultModelPath = "assets/models/example.glb";
 
     constexpr int TargetFps = 60;
@@ -22,6 +22,10 @@ namespace AppConfig {
     constexpr float MouseSensitivity = 0.0030f;
 
     constexpr float GroundY = 0.0f;
+    constexpr float GroundHeightfieldCellSize = 6.0f;
+    constexpr float MaxWalkSlopeRatio = 0.75f;
+    constexpr float MaxWalkStepHeight = 0.65f;
+
     constexpr float WalkEyeHeight = 1.75f;
     constexpr float FlyMinEyeHeight = 0.35f;
 
@@ -31,4 +35,5 @@ namespace AppConfig {
     constexpr int GridSlices = 40;
     constexpr float GridSpacing = 1.0f;
 }
+
 
