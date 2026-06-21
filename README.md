@@ -1,4 +1,4 @@
-# Montpellier Game – Prototype 0
+# Game – Prototype 0
 
 This repository contains the first building block of an experimental
 3D exploration game based on the 2016 Montpellier building dataset.
