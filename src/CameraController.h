@@ -15,7 +15,10 @@ struct CameraControllerState {
     float pitch;
     float moveSpeed;
     float mouseSensitivity;
+
+    float groundY;
     float walkEyeHeight;
+    float flyMinEyeHeight;
 
     bool mouseLookEnabled;
 

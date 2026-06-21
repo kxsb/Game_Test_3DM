@@ -33,10 +33,12 @@ namespace {
     }
 
     Vector3 RightFromFlatForward(Vector3 flatForward) {
+        // Main droite corrigée pour le repère raylib utilisé ici.
+        // Avant : { flatForward.z, 0, -flatForward.x }, ce qui inversait droite/gauche.
         Vector3 right = {
-            flatForward.z,
+            -flatForward.z,
             0.0f,
-            -flatForward.x
+            flatForward.x
         };
 
         return Vector3Normalize(right);
@@ -49,8 +51,23 @@ namespace {
         state->pitch = std::asin(ClampFloat(direction.y, -1.0f, 1.0f));
     }
 
-    void ApplyWalkHeight(Camera3D* camera, const CameraControllerState* state) {
-        camera->position.y = state->walkEyeHeight;
+    float WalkEyeY(const CameraControllerState* state) {
+        return state->groundY + state->walkEyeHeight;
+    }
+
+    float FlyMinY(const CameraControllerState* state) {
+        return state->groundY + state->flyMinEyeHeight;
+    }
+
+    void ApplyGroundConstraint(Camera3D* camera, const CameraControllerState* state) {
+        if (state->movementMode == CameraMovementMode::Walk) {
+            camera->position.y = WalkEyeY(state);
+            return;
+        }
+
+        if (camera->position.y < FlyMinY(state)) {
+            camera->position.y = FlyMinY(state);
+        }
     }
 }
 
@@ -73,7 +90,10 @@ CameraControllerState CreateCameraController(const Camera3D& camera) {
 
     state.moveSpeed = AppConfig::InitialMoveSpeed;
     state.mouseSensitivity = AppConfig::MouseSensitivity;
+
+    state.groundY = AppConfig::GroundY;
     state.walkEyeHeight = AppConfig::WalkEyeHeight;
+    state.flyMinEyeHeight = AppConfig::FlyMinEyeHeight;
 
     state.mouseLookEnabled = true;
     state.movementMode = CameraMovementMode::Fly;
@@ -105,21 +125,19 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
     if (IsKeyPressed(KEY_F)) {
         if (state->movementMode == CameraMovementMode::Fly) {
             state->movementMode = CameraMovementMode::Walk;
-            ApplyWalkHeight(camera, state);
         }
         else {
             state->movementMode = CameraMovementMode::Fly;
         }
+
+        ApplyGroundConstraint(camera, state);
     }
 
     if (IsKeyPressed(KEY_R)) {
         camera->position = state->initialPosition;
         camera->target = state->initialTarget;
         UpdateAnglesFromCamera(camera, state);
-
-        if (state->movementMode == CameraMovementMode::Walk) {
-            ApplyWalkHeight(camera, state);
-        }
+        ApplyGroundConstraint(camera, state);
     }
 
     const float wheel = GetMouseWheelMove();
@@ -186,9 +204,7 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
         camera->position = Vector3Add(camera->position, movement);
     }
 
-    if (state->movementMode == CameraMovementMode::Walk) {
-        ApplyWalkHeight(camera, state);
-    }
+    ApplyGroundConstraint(camera, state);
 
     camera->target = Vector3Add(camera->position, forward);
 }

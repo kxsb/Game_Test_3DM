@@ -4,7 +4,7 @@
 #include "raylib.h"
 
 void DrawHud(const Scene& scene, const CameraControllerState& cameraController) {
-    DrawRectangle(8, 8, 700, 168, Fade(RAYWHITE, 0.88f));
+    DrawRectangle(8, 8, 740, 190, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
 
@@ -37,7 +37,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Deplacement: ZQSD/WASD | F vol/marche | TAB souris | molette vitesse",
+        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | F vol/marche",
         16,
         108,
         16,
@@ -45,7 +45,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Vol: E monte, C descend | Shift accelere | Ctrl ralentit | R reset",
+        "Sol: collision simple active | Marche: hauteur humaine fixe",
         16,
         130,
         16,
@@ -53,12 +53,24 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Marche: hauteur humaine fixe, deplacement horizontal",
+        "Vol: E monte, C descend, sans passer sous le sol | Shift accelere | Ctrl ralentit | R reset",
         16,
         152,
         16,
         GRAY
     );
 
-    DrawFPS(16, 180);
+    DrawText(
+        TextFormat("GroundY %.2f | WalkEye %.2f | FlyMin %.2f",
+            cameraController.groundY,
+            cameraController.walkEyeHeight,
+            cameraController.flyMinEyeHeight
+        ),
+        16,
+        174,
+        16,
+        GRAY
+    );
+
+    DrawFPS(16, 202);
 }
