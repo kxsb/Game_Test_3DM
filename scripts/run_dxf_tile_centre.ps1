@@ -5,7 +5,11 @@
     [string]$DxfPath = "..\VilleMTP_MTP_Modele3D\Centre_BATIMENTS_2016.dxf",
     [string]$OutputPath = "assets\models\dxf_tile_centre.obj",
     [double]$CenterX = [double]::NaN,
-    [double]$CenterY = [double]::NaN
+    [double]$CenterY = [double]::NaN,
+    [switch]$NoCollisions,
+    [double]$CollisionMinHeight = 1.5,
+    [double]$CollisionMinThickness = 0.35,
+    [int]$CollisionMaxBoxes = 20000
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +19,7 @@ if (-not (Test-Path $DxfPath)) {
 }
 
 $ExtractScript = Join-Path $PSScriptRoot "dxf_extract_tile_obj.ps1"
+$CollisionScript = Join-Path $PSScriptRoot "generate_collision_sidecar_from_obj.ps1"
 $RunScript = Join-Path $PSScriptRoot "run_windows.ps1"
 
 if (-not (Test-Path $ExtractScript)) {
@@ -52,6 +57,21 @@ if (-not [double]::IsNaN($CenterY)) {
 
 if (-not (Test-Path $OutputPath)) {
     throw "Tile extraction did not create expected OBJ: $OutputPath"
+}
+
+if (-not $NoCollisions) {
+    if (-not (Test-Path $CollisionScript)) {
+        throw "Collision sidecar generator not found: $CollisionScript"
+    }
+
+    Write-Host ""
+    Write-Host "=== GENERATE COLLISION SIDECAR ==="
+
+    & $CollisionScript `
+        -Path $OutputPath `
+        -MinHeight $CollisionMinHeight `
+        -MinThickness $CollisionMinThickness `
+        -MaxBoxes $CollisionMaxBoxes
 }
 
 Write-Host ""
