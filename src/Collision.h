@@ -10,6 +10,15 @@ struct CollisionBox {
     Vector3 size;
 };
 
+struct CollisionSegment {
+    Vector3 a;
+    Vector3 b;
+
+    float minY = 0.0f;
+    float maxY = 0.0f;
+    float thickness = 0.35f;
+};
+
 struct CollisionWorld {
     float groundY = 0.0f;
 
@@ -19,6 +28,7 @@ struct CollisionWorld {
     float maxWalkStepHeight = 0.65f;
 
     std::vector<CollisionBox> solidBoxes;
+    std::vector<CollisionSegment> solidSegments;
 };
 
 struct PlayerCollisionBody {
@@ -49,6 +59,7 @@ Vector3 ResolveWalkMovement(
 );
 
 void DrawCollisionWorldDebug(const CollisionWorld& world);
+
 
 
 

@@ -14,7 +14,9 @@
 
     [double]$BaseVertexTolerance = 0.45,
 
-    [int]$MaxBoxes = 4000
+    [double]$SegmentThickness = 0.35,
+
+    [int]$MaxBoxes = 6000
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,69 +61,31 @@ function Get-Max3 {
     return [Math]::Max([Math]::Max($A, $B), $C)
 }
 
-function Get-CellKey {
-    param(
-        [int]$Ix,
-        [int]$Iz
-    )
+function ConvertTo-KeyFloat {
+    param([double]$Value)
 
-    return "$Ix`:$Iz"
+    return ([Math]::Round($Value, 2)).ToString("0.##", $InvariantCulture)
 }
 
-function Add-CellOccupation {
+function Get-SegmentKey {
     param(
-        [hashtable]$Cells,
-        [int]$Ix,
-        [int]$Iz,
-        [double]$MinY,
-        [double]$MaxY
+        [object]$A,
+        [object]$B
     )
 
-    $key = Get-CellKey -Ix $Ix -Iz $Iz
+    $aKey = "$(ConvertTo-KeyFloat $A.X),$(ConvertTo-KeyFloat $A.Z)"
+    $bKey = "$(ConvertTo-KeyFloat $B.X),$(ConvertTo-KeyFloat $B.Z)"
 
-    if (-not $Cells.ContainsKey($key)) {
-        $Cells[$key] = [pscustomobject]@{
-            Ix = $Ix
-            Iz = $Iz
-            MinY = $MinY
-            MaxY = $MaxY
-        }
-
-        return
+    if ([string]::CompareOrdinal($aKey, $bKey) -le 0) {
+        return "$aKey|$bKey"
     }
 
-    if ($MinY -lt $Cells[$key].MinY) {
-        $Cells[$key].MinY = $MinY
-    }
-
-    if ($MaxY -gt $Cells[$key].MaxY) {
-        $Cells[$key].MaxY = $MaxY
-    }
+    return "$bKey|$aKey"
 }
 
-function Add-PointToCollisionGrid {
+function Add-CollisionSegment {
     param(
-        [hashtable]$Cells,
-        [double]$X,
-        [double]$Z,
-        [double]$MinY,
-        [double]$MaxY
-    )
-
-    $ix = [Math]::Floor($X / $script:GridCellSize)
-    $iz = [Math]::Floor($Z / $script:GridCellSize)
-
-    Add-CellOccupation `
-        -Cells $Cells `
-        -Ix $ix `
-        -Iz $iz `
-        -MinY $MinY `
-        -MaxY $MaxY
-}
-
-function Add-SegmentToCollisionGrid {
-    param(
-        [hashtable]$Cells,
+        [hashtable]$Segments,
         [object]$A,
         [object]$B,
         [double]$MinY,
@@ -132,37 +96,50 @@ function Add-SegmentToCollisionGrid {
     $dz = $B.Z - $A.Z
     $length = [Math]::Sqrt(($dx * $dx) + ($dz * $dz))
 
-    $stepSize = [Math]::Max(0.50, $script:GridCellSize * 0.35)
-    $steps = [Math]::Max(1, [int][Math]::Ceiling($length / $stepSize))
-
-    for ($i = 0; $i -le $steps; $i++) {
-        $t = [double]$i / [double]$steps
-
-        $x = $A.X + ($dx * $t)
-        $z = $A.Z + ($dz * $t)
-
-        Add-PointToCollisionGrid `
-            -Cells $Cells `
-            -X $x `
-            -Z $z `
-            -MinY $MinY `
-            -MaxY $MaxY
+    if ($length -lt 0.35) {
+        return
     }
+
+    $key = Get-SegmentKey -A $A -B $B
+
+    if (-not $Segments.ContainsKey($key)) {
+        $Segments[$key] = [pscustomobject]@{
+            AX = $A.X
+            AZ = $A.Z
+            BX = $B.X
+            BZ = $B.Z
+            MinY = $MinY
+            MaxY = $MaxY
+            Count = 1
+        }
+
+        return
+    }
+
+    if ($MinY -lt $Segments[$key].MinY) {
+        $Segments[$key].MinY = $MinY
+    }
+
+    if ($MaxY -gt $Segments[$key].MaxY) {
+        $Segments[$key].MaxY = $MaxY
+    }
+
+    $Segments[$key].Count++
 }
 
-function Add-TriangleToCollisionGrid {
+function Add-TriangleCollisionSegments {
     param(
         [object]$A,
         [object]$B,
         [object]$C,
-        [hashtable]$Cells
+        [hashtable]$Segments
     )
 
     $minY = Get-Min3 $A.Y $B.Y $C.Y
     $maxY = Get-Max3 $A.Y $B.Y $C.Y
     $height = $maxY - $minY
 
-    if ($height -lt $script:MinimumWallHeight) {
+    if ($height -lt $MinWallHeight) {
         return
     }
 
@@ -170,204 +147,32 @@ function Add-TriangleToCollisionGrid {
 
     $lowVertices = New-Object System.Collections.Generic.List[object]
 
-    if ([Math]::Abs($A.Y - $minY) -le $script:BaseVertexTolerance) {
+    if ([Math]::Abs($A.Y - $minY) -le $BaseVertexTolerance) {
         $lowVertices.Add($A)
     }
 
-    if ([Math]::Abs($B.Y - $minY) -le $script:BaseVertexTolerance) {
+    if ([Math]::Abs($B.Y - $minY) -le $BaseVertexTolerance) {
         $lowVertices.Add($B)
     }
 
-    if ([Math]::Abs($C.Y - $minY) -le $script:BaseVertexTolerance) {
+    if ([Math]::Abs($C.Y - $minY) -le $BaseVertexTolerance) {
         $lowVertices.Add($C)
     }
 
-    if ($lowVertices.Count -ge 2) {
-        for ($i = 0; $i -lt $lowVertices.Count; $i++) {
-            for ($j = $i + 1; $j -lt $lowVertices.Count; $j++) {
-                Add-SegmentToCollisionGrid `
-                    -Cells $Cells `
-                    -A $lowVertices[$i] `
-                    -B $lowVertices[$j] `
-                    -MinY $minY `
-                    -MaxY $maxY
-            }
-        }
-
+    if ($lowVertices.Count -lt 2) {
         return
     }
 
-    if ($lowVertices.Count -eq 1) {
-        Add-PointToCollisionGrid `
-            -Cells $Cells `
-            -X $lowVertices[0].X `
-            -Z $lowVertices[0].Z `
-            -MinY $minY `
-            -MaxY $maxY
-
-        return
-    }
-
-    # Repli prudent : au pire, on marque le plus bas des trois points.
-    $lowest = $A
-
-    if ($B.Y -lt $lowest.Y) {
-        $lowest = $B
-    }
-
-    if ($C.Y -lt $lowest.Y) {
-        $lowest = $C
-    }
-
-    Add-PointToCollisionGrid `
-        -Cells $Cells `
-        -X $lowest.X `
-        -Z $lowest.Z `
-        -MinY $minY `
-        -MaxY $maxY
-}
-
-function Get-NextRemainingCell {
-    param([hashtable]$Remaining)
-
-    $best = $null
-
-    foreach ($cell in $Remaining.Values) {
-        if ($null -eq $best) {
-            $best = $cell
-            continue
-        }
-
-        if ($cell.Iz -lt $best.Iz) {
-            $best = $cell
-            continue
-        }
-
-        if ($cell.Iz -eq $best.Iz -and $cell.Ix -lt $best.Ix) {
-            $best = $cell
+    for ($i = 0; $i -lt $lowVertices.Count; $i++) {
+        for ($j = $i + 1; $j -lt $lowVertices.Count; $j++) {
+            Add-CollisionSegment `
+                -Segments $Segments `
+                -A $lowVertices[$i] `
+                -B $lowVertices[$j] `
+                -MinY $minY `
+                -MaxY $maxY
         }
     }
-
-    return $best
-}
-
-function Convert-GridToMergedBoxes {
-    param(
-        [hashtable]$Cells,
-        [double]$CellSize,
-        [double]$MinColumnHeight,
-        [double]$Padding,
-        [int]$MaxBoxes
-    )
-
-    $remaining = @{}
-
-    foreach ($entry in $Cells.GetEnumerator()) {
-        $remaining[$entry.Key] = $entry.Value
-    }
-
-    $boxes = New-Object System.Collections.Generic.List[object]
-
-    while ($remaining.Count -gt 0) {
-        if ($boxes.Count -ge $MaxBoxes) {
-            break
-        }
-
-        $start = Get-NextRemainingCell -Remaining $remaining
-
-        if ($null -eq $start) {
-            break
-        }
-
-        $widthCells = 1
-
-        while ($true) {
-            $nextIx = $start.Ix + $widthCells
-            $key = Get-CellKey -Ix $nextIx -Iz $start.Iz
-
-            if ($remaining.ContainsKey($key)) {
-                $widthCells++
-            }
-            else {
-                break
-            }
-        }
-
-        $depthCells = 1
-
-        while ($true) {
-            $nextIz = $start.Iz + $depthCells
-            $rowOk = $true
-
-            for ($dx = 0; $dx -lt $widthCells; $dx++) {
-                $key = Get-CellKey -Ix ($start.Ix + $dx) -Iz $nextIz
-
-                if (-not $remaining.ContainsKey($key)) {
-                    $rowOk = $false
-                    break
-                }
-            }
-
-            if ($rowOk) {
-                $depthCells++
-            }
-            else {
-                break
-            }
-        }
-
-        $minY = [double]::PositiveInfinity
-        $maxY = [double]::NegativeInfinity
-
-        for ($dz = 0; $dz -lt $depthCells; $dz++) {
-            for ($dx = 0; $dx -lt $widthCells; $dx++) {
-                $key = Get-CellKey -Ix ($start.Ix + $dx) -Iz ($start.Iz + $dz)
-                $cell = $remaining[$key]
-
-                if ($cell.MinY -lt $minY) {
-                    $minY = $cell.MinY
-                }
-
-                if ($cell.MaxY -gt $maxY) {
-                    $maxY = $cell.MaxY
-                }
-            }
-        }
-
-        for ($dz = 0; $dz -lt $depthCells; $dz++) {
-            for ($dx = 0; $dx -lt $widthCells; $dx++) {
-                $key = Get-CellKey -Ix ($start.Ix + $dx) -Iz ($start.Iz + $dz)
-                $remaining.Remove($key)
-            }
-        }
-
-        $height = $maxY - $minY
-
-        if ($height -lt $MinColumnHeight) {
-            continue
-        }
-
-        $centerX = ($start.Ix + ($widthCells / 2.0)) * $CellSize
-        $centerZ = ($start.Iz + ($depthCells / 2.0)) * $CellSize
-        $centerY = ($minY + $maxY) / 2.0
-
-        $sizeX = ($widthCells * $CellSize) + $Padding
-        $sizeY = $height
-        $sizeZ = ($depthCells * $CellSize) + $Padding
-
-        $boxes.Add([pscustomobject]@{
-            CenterX = $centerX
-            CenterY = $centerY
-            CenterZ = $centerZ
-            SizeX = $sizeX
-            SizeY = $sizeY
-            SizeZ = $sizeZ
-            WidthCells = $widthCells
-            DepthCells = $depthCells
-        })
-    }
-
-    return $boxes
 }
 
 if (-not (Test-Path $Path)) {
@@ -379,12 +184,9 @@ if (-not $OutputPath) {
 }
 
 $vertices = New-Object System.Collections.Generic.List[object]
-$cells = @{}
+$segments = @{}
 
-$script:GridCellSize = $CellSize
-$script:MinimumWallHeight = $MinWallHeight
 $script:ContributingTriangles = 0
-
 $faceCount = 0
 
 $reader = [System.IO.StreamReader]::new((Resolve-Path $Path).Path)
@@ -444,11 +246,11 @@ try {
                     continue
                 }
 
-                Add-TriangleToCollisionGrid `
+                Add-TriangleCollisionSegments `
                     -A $vertices[$aIndex] `
                     -B $vertices[$bIndex] `
                     -C $vertices[$cIndex] `
-                    -Cells $cells
+                    -Segments $segments
 
                 $faceCount++
             }
@@ -459,40 +261,39 @@ finally {
     $reader.Close()
 }
 
-$boxes = Convert-GridToMergedBoxes `
-    -Cells $cells `
-    -CellSize $CellSize `
-    -MinColumnHeight $MinColumnHeight `
-    -Padding $ColumnPadding `
-    -MaxBoxes $MaxBoxes
-
 $collisionLines = New-Object System.Collections.Generic.List[string]
-$collisionLines.Add("# Montpellier Game collision sidecar generated from OBJ merged grid")
-$collisionLines.Add("# Format: box cx cy cz sx sy sz")
-$collisionLines.Add("# Source OBJ: $Path")
-$collisionLines.Add("# CellSize: $CellSize")
+$collisionLines.Add("# Montpellier Game collision sidecar generated from wall base segments")
+$collisionLines.Add("# Format: seg ax az bx bz minY maxY thickness")
+$collisionLines.Add("# Source OBJ: local path omitted")
+$collisionLines.Add("# Mode: wall_base_segments")
+$collisionLines.Add("# CellSize legacy parameter ignored: $CellSize")
 $collisionLines.Add("# MinWallHeight: $MinWallHeight")
-$collisionLines.Add("# MinColumnHeight: $MinColumnHeight")
-$collisionLines.Add("# ColumnPadding: $ColumnPadding")
-$collisionLines.Add("# Mode: footprint_base_edges")
 $collisionLines.Add("# BaseVertexTolerance: $BaseVertexTolerance")
+$collisionLines.Add("# SegmentThickness: $SegmentThickness")
 
-foreach ($box in $boxes) {
+$count = 0
+
+foreach ($segment in ($segments.Values | Sort-Object AZ, AX, BZ, BX)) {
+    if ($count -ge $MaxBoxes) {
+        break
+    }
+
     $collisionLines.Add(
-        "box $(ConvertTo-InvariantFloat $box.CenterX) $(ConvertTo-InvariantFloat $box.CenterY) $(ConvertTo-InvariantFloat $box.CenterZ) $(ConvertTo-InvariantFloat $box.SizeX) $(ConvertTo-InvariantFloat $box.SizeY) $(ConvertTo-InvariantFloat $box.SizeZ)"
+        "seg $(ConvertTo-InvariantFloat $segment.AX) $(ConvertTo-InvariantFloat $segment.AZ) $(ConvertTo-InvariantFloat $segment.BX) $(ConvertTo-InvariantFloat $segment.BZ) $(ConvertTo-InvariantFloat $segment.MinY) $(ConvertTo-InvariantFloat $segment.MaxY) $(ConvertTo-InvariantFloat $SegmentThickness)"
     )
+
+    $count++
 }
 
 Set-Content -Path $OutputPath -Value $collisionLines -Encoding ASCII
 
-Write-Host "=== COLLISION SIDECAR FROM OBJ MERGED GRID ==="
+Write-Host "=== COLLISION SIDECAR FROM WALL BASE SEGMENTS ==="
 Write-Host "Source OBJ : $Path"
 Write-Host "Output : $OutputPath"
 Write-Host "Vertices read : $($vertices.Count)"
 Write-Host "Triangles scanned : $faceCount"
 Write-Host "Triangles contributing : $ContributingTriangles"
-Write-Host "Occupied cells before merge : $($cells.Count)"
-Write-Host "Collision boxes after merge : $($boxes.Count)"
-Write-Host "Cell size : $CellSize"
-Write-Host "Mode : footprint_base_edges"
-Write-Host "Base vertex tolerance : $BaseVertexTolerance"
+Write-Host "Segments after dedupe : $($segments.Count)"
+Write-Host "Segments written : $count"
+Write-Host "Max segments : $MaxBoxes"
+Write-Host "Segment thickness : $SegmentThickness"

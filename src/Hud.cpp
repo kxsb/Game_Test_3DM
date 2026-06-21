@@ -37,8 +37,9 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        TextFormat("Collisions: %d boites | rayon joueur %.2f | debug B: %s",
+        TextFormat("Collisions: %d boites + %d segments | rayon joueur %.2f | debug B: %s",
             static_cast<int>(scene.collisionWorld.solidBoxes.size()),
+            static_cast<int>(scene.collisionWorld.solidSegments.size()),
             player.playerRadius,
             player.collisionDebugEnabled ? "ON" : "OFF"
         ),
@@ -143,4 +144,5 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
 
     DrawFPS(16, 290);
 }
+
 

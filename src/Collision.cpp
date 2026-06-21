@@ -43,6 +43,69 @@ namespace {
         return playerMaxY >= boxMinY && playerMinY <= boxMaxY;
     }
 
+    bool PlayerVerticalOverlapsSegment(
+        Vector3 eyePosition,
+        const PlayerCollisionBody& body,
+        const CollisionSegment& segment
+    ) {
+        const float playerMinY = eyePosition.y - body.eyeHeight;
+        const float playerMaxY = playerMinY + body.height;
+
+        const float segmentMinY = std::min(segment.minY, segment.maxY);
+        const float segmentMaxY = std::max(segment.minY, segment.maxY);
+
+        return playerMaxY >= segmentMinY && playerMinY <= segmentMaxY;
+    }
+
+    float DistanceSquaredPointToSegmentXZ(
+        Vector3 point,
+        Vector3 a,
+        Vector3 b
+    ) {
+        const float abX = b.x - a.x;
+        const float abZ = b.z - a.z;
+
+        const float apX = point.x - a.x;
+        const float apZ = point.z - a.z;
+
+        const float abLengthSquared = abX * abX + abZ * abZ;
+
+        if (abLengthSquared <= 0.000001f) {
+            const float dx = point.x - a.x;
+            const float dz = point.z - a.z;
+            return dx * dx + dz * dz;
+        }
+
+        const float t = ClampFloat(
+            (apX * abX + apZ * abZ) / abLengthSquared,
+            0.0f,
+            1.0f
+        );
+
+        const float nearestX = a.x + abX * t;
+        const float nearestZ = a.z + abZ * t;
+
+        const float dx = point.x - nearestX;
+        const float dz = point.z - nearestZ;
+
+        return dx * dx + dz * dz;
+    }
+
+    bool PlayerCylinderOverlapsSegmentXZ(
+        Vector3 eyePosition,
+        const PlayerCollisionBody& body,
+        const CollisionSegment& segment
+    ) {
+        const float collisionRadius = body.radius + segment.thickness * 0.5f;
+        const float distanceSquared = DistanceSquaredPointToSegmentXZ(
+            eyePosition,
+            segment.a,
+            segment.b
+        );
+
+        return distanceSquared <= collisionRadius * collisionRadius;
+    }
+
     float WalkEyeYAtPosition(
         Vector3 eyePosition,
         const PlayerCollisionBody& body,
@@ -140,6 +203,16 @@ bool IsPlayerCollidingAtPosition(
         }
     }
 
+    for (const CollisionSegment& segment : world.solidSegments) {
+        if (!PlayerVerticalOverlapsSegment(eyePosition, body, segment)) {
+            continue;
+        }
+
+        if (PlayerCylinderOverlapsSegmentXZ(eyePosition, body, segment)) {
+            return true;
+        }
+    }
+
     return false;
 }
 
@@ -174,7 +247,6 @@ void DrawCollisionWorldDebug(const CollisionWorld& world) {
     for (const CollisionBox& box : world.solidBoxes) {
         const float boxMinY = box.center.y - box.size.y * 0.5f;
 
-        // Empreinte au sol : c'est ce qu'on doit comparer aux façades visibles.
         const float footprintHeight = 0.18f;
         const Vector3 footprintCenter = {
             box.center.x,
@@ -187,25 +259,25 @@ void DrawCollisionWorldDebug(const CollisionWorld& world) {
             box.size.z
         };
 
-        DrawCubeWiresV(footprintCenter, footprintSize, RED);
+        DrawCubeWiresV(footprintCenter, footprintSize, Fade(RED, 0.35f));
+    }
 
-        // Volume bas de lecture : assez haut pour comprendre l'obstacle,
-        // pas assez pour masquer toute la ville avec des cages verticales.
-        const float markerHeight = std::min(box.size.y, 2.0f);
-        const Vector3 lowWallCenter = {
-            box.center.x,
-            boxMinY + markerHeight * 0.5f,
-            box.center.z
-        };
-        const Vector3 lowWallSize = {
-            box.size.x,
-            markerHeight,
-            box.size.z
-        };
+    for (const CollisionSegment& segment : world.solidSegments) {
+        const float y = std::min(segment.minY, segment.maxY) + 0.08f;
+        const float topY = std::min(std::max(segment.minY, segment.maxY), y + 2.0f);
 
-        DrawCubeWiresV(lowWallCenter, lowWallSize, Fade(RED, 0.45f));
+        const Vector3 a = { segment.a.x, y, segment.a.z };
+        const Vector3 b = { segment.b.x, y, segment.b.z };
+        const Vector3 aTop = { segment.a.x, topY, segment.a.z };
+        const Vector3 bTop = { segment.b.x, topY, segment.b.z };
+
+        DrawLine3D(a, b, RED);
+        DrawLine3D(aTop, bTop, Fade(RED, 0.35f));
+        DrawLine3D(a, aTop, Fade(RED, 0.25f));
+        DrawLine3D(b, bTop, Fade(RED, 0.25f));
     }
 }
+
 
 
 

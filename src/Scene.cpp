@@ -97,11 +97,16 @@ namespace {
         }
 
         world->solidBoxes.clear();
+        world->solidSegments.clear();
 
         std::string line;
         int loadedBoxes = 0;
         int parsedBoxLines = 0;
         int failedBoxLines = 0;
+
+        int loadedSegments = 0;
+        int parsedSegmentLines = 0;
+        int failedSegmentLines = 0;
 
         while (std::getline(input, line)) {
             if (line.empty()) {
@@ -118,36 +123,74 @@ namespace {
             std::string kind;
             iss >> kind;
 
-            if (kind != "box") {
+            if (kind == "box") {
+                parsedBoxLines++;
+
+                CollisionBox box = {};
+                iss >> box.center.x >> box.center.y >> box.center.z >> box.size.x >> box.size.y >> box.size.z;
+
+                if (!iss.fail()) {
+                    world->solidBoxes.push_back(box);
+                    loadedBoxes++;
+                }
+                else {
+                    failedBoxLines++;
+                }
+
                 continue;
             }
 
-            parsedBoxLines++;
+            if (kind == "seg") {
+                parsedSegmentLines++;
 
-            CollisionBox box = {};
-            iss >> box.center.x >> box.center.y >> box.center.z >> box.size.x >> box.size.y >> box.size.z;
+                CollisionSegment segment = {};
+                iss >>
+                    segment.a.x >>
+                    segment.a.z >>
+                    segment.b.x >>
+                    segment.b.z >>
+                    segment.minY >>
+                    segment.maxY >>
+                    segment.thickness;
 
-            if (!iss.fail()) {
-                world->solidBoxes.push_back(box);
-                loadedBoxes++;
-            }
-            else {
-                failedBoxLines++;
+                if (!iss.fail()) {
+                    if (segment.maxY < segment.minY) {
+                        std::swap(segment.minY, segment.maxY);
+                    }
+
+                    if (segment.thickness <= 0.0f) {
+                        segment.thickness = 0.35f;
+                    }
+
+                    segment.a.y = segment.minY;
+                    segment.b.y = segment.minY;
+
+                    world->solidSegments.push_back(segment);
+                    loadedSegments++;
+                }
+                else {
+                    failedSegmentLines++;
+                }
+
+                continue;
             }
         }
 
         TraceLog(
             LOG_INFO,
             TextFormat(
-                "Collision sidecar parse: path=%s lines=%d loaded=%d failed=%d",
+                "Collision sidecar parse: path=%s boxLines=%d boxes=%d boxFailed=%d segLines=%d segments=%d segFailed=%d",
                 path.c_str(),
                 parsedBoxLines,
                 loadedBoxes,
-                failedBoxLines
+                failedBoxLines,
+                parsedSegmentLines,
+                loadedSegments,
+                failedSegmentLines
             )
         );
 
-        return loadedBoxes > 0;
+        return loadedBoxes > 0 || loadedSegments > 0;
     }
 
     float ComputeGridSpacing(float extent) {
@@ -268,6 +311,8 @@ void LoadScene(Scene* scene, const char* modelPath) {
 
         if (!scene->externalCollisionLoaded) {
             scene->collisionWorld.solidBoxes.clear();
+    scene->collisionWorld.solidSegments.clear();
+            scene->collisionWorld.solidSegments.clear();
         }
 
         TraceLog(LOG_INFO, TextFormat("Loaded model: %s", scene->modelPath.c_str()));
@@ -382,6 +427,7 @@ void UnloadScene(Scene* scene) {
 
     scene->modelStats = {};
     scene->collisionWorld.solidBoxes.clear();
+    scene->collisionWorld.solidSegments.clear();
 }
 
 void AdjustSceneGround(Scene* scene, float deltaY) {
@@ -410,6 +456,7 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
 
 
 
