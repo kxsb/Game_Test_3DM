@@ -2,6 +2,7 @@
 #include "AppConfig.h"
 #include "ModelUtils.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -53,6 +54,7 @@ namespace {
         std::ifstream input(path);
 
         if (!input.is_open()) {
+            TraceLog(LOG_WARNING, TextFormat("Collision sidecar open failed: %s", path.c_str()));
             return false;
         }
 
@@ -60,6 +62,8 @@ namespace {
 
         std::string line;
         int loadedBoxes = 0;
+        int parsedBoxLines = 0;
+        int failedBoxLines = 0;
 
         while (std::getline(input, line)) {
             if (line.empty()) {
@@ -70,6 +74,9 @@ namespace {
                 continue;
             }
 
+            // Robustesse Windows/fr-FR : accepte les nombres en virgule décimale.
+            std::replace(line.begin(), line.end(), ',', '.');
+
             std::istringstream iss(line);
             std::string kind;
             iss >> kind;
@@ -78,6 +85,8 @@ namespace {
                 continue;
             }
 
+            parsedBoxLines++;
+
             CollisionBox box = {};
             iss >> box.center.x >> box.center.y >> box.center.z >> box.size.x >> box.size.y >> box.size.z;
 
@@ -85,7 +94,21 @@ namespace {
                 world->solidBoxes.push_back(box);
                 loadedBoxes++;
             }
+            else {
+                failedBoxLines++;
+            }
         }
+
+        TraceLog(
+            LOG_INFO,
+            TextFormat(
+                "Collision sidecar parse: path=%s lines=%d loaded=%d failed=%d",
+                path.c_str(),
+                parsedBoxLines,
+                loadedBoxes,
+                failedBoxLines
+            )
+        );
 
         return loadedBoxes > 0;
     }
@@ -136,7 +159,7 @@ void LoadScene(Scene* scene, const char* modelPath) {
             );
         }
         else {
-            TraceLog(LOG_WARNING, TextFormat("No collision sidecar found: %s", scene->collisionSidecarPath.c_str()));
+            TraceLog(LOG_WARNING, TextFormat("No usable collision sidecar: %s", scene->collisionSidecarPath.c_str()));
         }
     }
     else {

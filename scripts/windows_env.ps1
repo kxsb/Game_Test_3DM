@@ -11,6 +11,21 @@
     }
 }
 
+function Compress-Path {
+    $seen = @{}
+    $parts = @()
+
+    foreach ($part in ($env:Path -split ';')) {
+        if (-not $part) { continue }
+        if ($seen.ContainsKey($part)) { continue }
+
+        $seen[$part] = $true
+        $parts += $part
+    }
+
+    $env:Path = ($parts -join ';')
+}
+
 function Find-MontpellierProjectRoot {
     param([string]$StartPath = (Get-Location).Path)
 
@@ -49,6 +64,8 @@ function Initialize-MontpellierWindowsDevEnv {
         Add-PathFront $PathPart
     }
 
+    Compress-Path
+
     $ProjectRoot = Find-MontpellierProjectRoot
     Set-Location $ProjectRoot
 
@@ -76,7 +93,7 @@ function Initialize-MontpellierWindowsDevEnv {
         "C:\Program Files\Git\bin"
     ) -join ';'
 
-    $VsCommand = 'set "PATH=' + $EnvBootstrapPath + ';%PATH%" && call "' + $VsDevCmd + '" -arch=x64 -host_arch=x64 >nul && set'
+    $VsCommand = 'set "PATH=' + $EnvBootstrapPath + '" && call "' + $VsDevCmd + '" -arch=x64 -host_arch=x64 >nul && set'
 
     & $CmdExe /d /s /c $VsCommand |
         ForEach-Object {
@@ -94,6 +111,7 @@ function Initialize-MontpellierWindowsDevEnv {
 
     Add-PathFront $CMakeDir
     Add-PathFront $NinjaDir
+    Compress-Path
 
     if (-not $Quiet) {
         Write-Host "Projet : $ProjectRoot"

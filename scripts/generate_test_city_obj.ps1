@@ -4,6 +4,13 @@
 
 $ErrorActionPreference = "Stop"
 
+$InvariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
+
+function Format-Float {
+    param([double]$Value)
+    return $Value.ToString("0.###", $InvariantCulture)
+}
+
 $OutputDir = Split-Path $OutputPath
 if ($OutputDir) {
     New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -24,15 +31,17 @@ $vertexIndex = 1
 
 function Add-Cube {
     param(
-        [float]$Cx,
-        [float]$Cy,
-        [float]$Cz,
-        [float]$Sx,
-        [float]$Sy,
-        [float]$Sz
+        [double]$Cx,
+        [double]$Cy,
+        [double]$Cz,
+        [double]$Sx,
+        [double]$Sy,
+        [double]$Sz
     )
 
-    $script:collisionLines.Add(("box {0:0.###} {1:0.###} {2:0.###} {3:0.###} {4:0.###} {5:0.###}" -f $Cx, $Cy, $Cz, $Sx, $Sy, $Sz))
+    $script:collisionLines.Add(
+        "box $(Format-Float $Cx) $(Format-Float $Cy) $(Format-Float $Cz) $(Format-Float $Sx) $(Format-Float $Sy) $(Format-Float $Sz)"
+    )
 
     $x0 = $Cx - $Sx / 2.0
     $x1 = $Cx + $Sx / 2.0
@@ -49,7 +58,7 @@ function Add-Cube {
     )
 
     foreach ($v in $vertices) {
-        $script:lines.Add(("v {0:0.###} {1:0.###} {2:0.###}" -f $v[0], $v[1], $v[2]))
+        $script:lines.Add("v $(Format-Float $v[0]) $(Format-Float $v[1]) $(Format-Float $v[2])")
     }
 
     $faces = @(
@@ -97,3 +106,7 @@ Write-Host "OBJ généré : $OutputPath"
 Write-Host "Sidecar collisions : $CollisionPath"
 Write-Host "Vertices : $($vertexIndex - 1)"
 Write-Host "Boîtes collision : $($collisionLines.Count - 2)"
+
+Write-Host ""
+Write-Host "Aperçu sidecar :"
+Get-Content $CollisionPath -TotalCount 6
