@@ -45,3 +45,6 @@ assets/models/*.bin
 # OS clutter
 .DS_Store
 Thumbs.db
+
+# Generated collision sidecars
+assets/models/*.collisions.txt

@@ -4,7 +4,7 @@
 #include "raylib.h"
 
 void DrawHud(const Scene& scene, const PlayerControllerState& player) {
-    DrawRectangle(8, 8, 840, 278, Fade(RAYWHITE, 0.88f));
+    DrawRectangle(8, 8, 860, 300, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
 
@@ -17,7 +17,7 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        scene.modelLoaded ? scene.modelPath : "Fallback: aucun modele GLB/OBJ charge",
+        scene.modelLoaded ? scene.modelPath.c_str() : "Fallback: aucun modele GLB/OBJ charge",
         16,
         64,
         16,
@@ -78,6 +78,14 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
             16,
             GRAY
         );
+
+        DrawText(
+            scene.externalCollisionLoaded ? "Sidecar collisions: charge" : "Sidecar collisions: absent",
+            16,
+            174,
+            16,
+            GRAY
+        );
     }
     else {
         DrawText(
@@ -98,15 +106,7 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     }
 
     DrawText(
-        "Architecture: Scene mesure le modele, PlayerController pilote le joueur",
-        16,
-        174,
-        16,
-        GRAY
-    );
-
-    DrawText(
-        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | TAB souris",
+        "B affiche bounds bleus + collisions rouges",
         16,
         196,
         16,
@@ -114,9 +114,17 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        "F marche/vol | B debug collisions/bounds | Shift accelere | Ctrl ralentit | R reset",
+        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | TAB souris",
         16,
         218,
+        16,
+        GRAY
+    );
+
+    DrawText(
+        "F marche/vol | Shift accelere | Ctrl ralentit | R reset",
+        16,
+        240,
         16,
         GRAY
     );
@@ -128,10 +136,10 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
             player.position.z
         ),
         16,
-        240,
+        262,
         16,
         GRAY
     );
 
-    DrawFPS(16, 268);
+    DrawFPS(16, 290);
 }

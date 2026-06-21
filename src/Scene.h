@@ -4,6 +4,8 @@
 #include "ProceduralCity.h"
 #include "raylib.h"
 
+#include <string>
+
 struct SceneModelStats {
     int meshCount = 0;
     int materialCount = 0;
@@ -16,7 +18,9 @@ struct SceneModelStats {
 struct Scene {
     Model model = {};
     bool modelLoaded = false;
-    const char* modelPath = nullptr;
+    std::string modelPath;
+    std::string collisionSidecarPath;
+    bool externalCollisionLoaded = false;
 
     SceneModelStats modelStats;
 

@@ -2,6 +2,10 @@
 #include "AppConfig.h"
 #include "ModelUtils.h"
 
+#include <fstream>
+#include <sstream>
+#include <string>
+
 namespace {
     CollisionWorld BuildCollisionWorldFromProceduralCity(const ProceduralCity& city) {
         CollisionWorld world = {};
@@ -33,25 +37,83 @@ namespace {
 
         return stats;
     }
+
+    std::string BuildCollisionSidecarPath(const std::string& modelPath) {
+        const size_t slashPos = modelPath.find_last_of("/\\");
+        const size_t dotPos = modelPath.find_last_of('.');
+
+        if (dotPos == std::string::npos || (slashPos != std::string::npos && dotPos < slashPos)) {
+            return modelPath + ".collisions.txt";
+        }
+
+        return modelPath.substr(0, dotPos) + ".collisions.txt";
+    }
+
+    bool LoadCollisionSidecar(const std::string& path, CollisionWorld* world) {
+        std::ifstream input(path);
+
+        if (!input.is_open()) {
+            return false;
+        }
+
+        world->solidBoxes.clear();
+
+        std::string line;
+        int loadedBoxes = 0;
+
+        while (std::getline(input, line)) {
+            if (line.empty()) {
+                continue;
+            }
+
+            if (line[0] == '#') {
+                continue;
+            }
+
+            std::istringstream iss(line);
+            std::string kind;
+            iss >> kind;
+
+            if (kind != "box") {
+                continue;
+            }
+
+            CollisionBox box = {};
+            iss >> box.center.x >> box.center.y >> box.center.z >> box.size.x >> box.size.y >> box.size.z;
+
+            if (!iss.fail()) {
+                world->solidBoxes.push_back(box);
+                loadedBoxes++;
+            }
+        }
+
+        return loadedBoxes > 0;
+    }
 }
 
 void LoadScene(Scene* scene, const char* modelPath) {
     scene->modelPath = modelPath;
+    scene->collisionSidecarPath = BuildCollisionSidecarPath(scene->modelPath);
+    scene->externalCollisionLoaded = false;
+
     scene->proceduralCity = CreateProceduralCity();
     scene->collisionWorld = BuildCollisionWorldFromProceduralCity(scene->proceduralCity);
     scene->modelStats = {};
 
     if (FileExists(modelPath)) {
         scene->model = LoadModel(modelPath);
-        CenterModel(&scene->model);
+        NormalizeModelToGround(&scene->model, AppConfig::GroundY);
         scene->modelStats = ComputeSceneModelStats(&scene->model);
         scene->modelLoaded = true;
 
-        // Les collisions fines des modèles externes seront traitées dans une brique dédiée.
-        // Pour l'instant, le mode modèle externe sert à valider le pipeline asset.
-        scene->collisionWorld.solidBoxes.clear();
+        scene->collisionWorld.groundY = AppConfig::GroundY;
+        scene->externalCollisionLoaded = LoadCollisionSidecar(scene->collisionSidecarPath, &scene->collisionWorld);
 
-        TraceLog(LOG_INFO, TextFormat("Loaded model: %s", modelPath));
+        if (!scene->externalCollisionLoaded) {
+            scene->collisionWorld.solidBoxes.clear();
+        }
+
+        TraceLog(LOG_INFO, TextFormat("Loaded model: %s", scene->modelPath.c_str()));
         TraceLog(
             LOG_INFO,
             TextFormat(
@@ -62,6 +124,20 @@ void LoadScene(Scene* scene, const char* modelPath) {
                 scene->modelStats.triangleCount
             )
         );
+
+        if (scene->externalCollisionLoaded) {
+            TraceLog(
+                LOG_INFO,
+                TextFormat(
+                    "Loaded collision sidecar: %s (%d boxes)",
+                    scene->collisionSidecarPath.c_str(),
+                    static_cast<int>(scene->collisionWorld.solidBoxes.size())
+                )
+            );
+        }
+        else {
+            TraceLog(LOG_WARNING, TextFormat("No collision sidecar found: %s", scene->collisionSidecarPath.c_str()));
+        }
     }
     else {
         scene->modelLoaded = false;
