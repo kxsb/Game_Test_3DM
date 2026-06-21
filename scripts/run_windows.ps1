@@ -13,6 +13,11 @@ $Exe = Get-ChildItem -Path .\build -Recurse -Filter "montpellier.exe" | Select-O
 if (-not $Exe) {
     Write-Host "Executable introuvable. Build préalable."
     & "$PSScriptRoot\build_windows.ps1"
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build préalable échoué."
+    }
+
     $Exe = Get-ChildItem -Path .\build -Recurse -Filter "montpellier.exe" | Select-Object -First 1
 }
 

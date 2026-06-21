@@ -49,7 +49,7 @@ int RunGame(int argc, char** argv) {
         DrawScene(scene);
 
         if (player.collisionDebugEnabled) {
-            DrawCollisionWorldDebug(scene.collisionWorld);
+            DrawSceneDebug(scene);
         }
 
         EndMode3D();

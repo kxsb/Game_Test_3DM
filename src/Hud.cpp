@@ -4,12 +4,12 @@
 #include "raylib.h"
 
 void DrawHud(const Scene& scene, const PlayerControllerState& player) {
-    DrawRectangle(8, 8, 780, 234, Fade(RAYWHITE, 0.88f));
+    DrawRectangle(8, 8, 840, 278, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
 
     DrawText(
-        scene.modelLoaded ? "Mode scene: modele charge" : "Mode scene: mini-ville procedurale",
+        scene.modelLoaded ? "Mode scene: modele externe charge" : "Mode scene: mini-ville procedurale",
         16,
         42,
         16,
@@ -48,24 +48,57 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
         GRAY
     );
 
-    DrawText(
-        "Architecture: PlayerController pilote la position, Camera3D suit le joueur",
-        16,
-        130,
-        16,
-        GRAY
-    );
+    if (scene.modelLoaded) {
+        DrawText(
+            TextFormat(
+                "Modele: meshes %d | materiaux %d | vertices %d | triangles %d",
+                scene.modelStats.meshCount,
+                scene.modelStats.materialCount,
+                scene.modelStats.vertexCount,
+                scene.modelStats.triangleCount
+            ),
+            16,
+            130,
+            16,
+            GRAY
+        );
+
+        DrawText(
+            TextFormat(
+                "Bounds: min(%.2f %.2f %.2f) max(%.2f %.2f %.2f)",
+                scene.modelStats.bounds.min.x,
+                scene.modelStats.bounds.min.y,
+                scene.modelStats.bounds.min.z,
+                scene.modelStats.bounds.max.x,
+                scene.modelStats.bounds.max.y,
+                scene.modelStats.bounds.max.z
+            ),
+            16,
+            152,
+            16,
+            GRAY
+        );
+    }
+    else {
+        DrawText(
+            "Modele: fallback procedural, collisions batiments actives",
+            16,
+            130,
+            16,
+            GRAY
+        );
+
+        DrawText(
+            "Astuce: lance scripts/run_test_model.ps1 pour tester un OBJ externe genere",
+            16,
+            152,
+            16,
+            GRAY
+        );
+    }
 
     DrawText(
-        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | TAB souris",
-        16,
-        152,
-        16,
-        GRAY
-    );
-
-    DrawText(
-        "F marche/vol | B debug collisions | Shift accelere | Ctrl ralentit | R reset",
+        "Architecture: Scene mesure le modele, PlayerController pilote le joueur",
         16,
         174,
         16,
@@ -73,9 +106,17 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        "Marche: collisions batiments | Vol: E monte, C descend",
+        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | TAB souris",
         16,
         196,
+        16,
+        GRAY
+    );
+
+    DrawText(
+        "F marche/vol | B debug collisions/bounds | Shift accelere | Ctrl ralentit | R reset",
+        16,
+        218,
         16,
         GRAY
     );
@@ -87,10 +128,10 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
             player.position.z
         ),
         16,
-        218,
+        240,
         16,
         GRAY
     );
 
-    DrawFPS(16, 246);
+    DrawFPS(16, 268);
 }
