@@ -1,8 +1,8 @@
 ﻿#include "Game.h"
 
 #include "AppConfig.h"
-#include "CameraController.h"
 #include "Hud.h"
+#include "PlayerController.h"
 #include "Scene.h"
 
 #include "raylib.h"
@@ -31,7 +31,7 @@ int RunGame(int argc, char** argv) {
     InitWindow(AppConfig::ScreenWidth, AppConfig::ScreenHeight, AppConfig::WindowTitle);
 
     Camera3D camera = CreateInitialCamera();
-    CameraControllerState cameraController = CreateCameraController(camera);
+    PlayerControllerState player = CreatePlayerController(camera);
 
     SetTargetFPS(AppConfig::TargetFps);
 
@@ -39,7 +39,8 @@ int RunGame(int argc, char** argv) {
     LoadScene(&scene, ResolveModelPath(argc, argv));
 
     while (!WindowShouldClose()) {
-        UpdateCameraController(&camera, &cameraController, scene.collisionWorld);
+        UpdatePlayerController(&player, scene.collisionWorld);
+        ApplyPlayerToCamera(player, &camera);
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -47,13 +48,13 @@ int RunGame(int argc, char** argv) {
         BeginMode3D(camera);
         DrawScene(scene);
 
-        if (cameraController.collisionDebugEnabled) {
+        if (player.collisionDebugEnabled) {
             DrawCollisionWorldDebug(scene.collisionWorld);
         }
 
         EndMode3D();
 
-        DrawHud(scene, cameraController);
+        DrawHud(scene, player);
 
         EndDrawing();
     }

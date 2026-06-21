@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "CameraController.h"
+#include "PlayerController.h"
 #include "Scene.h"
 
-void DrawHud(const Scene& scene, const CameraControllerState& cameraController);
+void DrawHud(const Scene& scene, const PlayerControllerState& player);

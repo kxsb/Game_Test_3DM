@@ -3,7 +3,7 @@
 
 #include "raylib.h"
 
-void DrawHud(const Scene& scene, const CameraControllerState& cameraController) {
+void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     DrawRectangle(8, 8, 780, 234, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
@@ -25,10 +25,10 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        TextFormat("Camera: %s | vitesse %.1f | souris %s",
-            GetCameraMovementModeLabel(cameraController.movementMode),
-            cameraController.moveSpeed,
-            cameraController.mouseLookEnabled ? "capturee" : "libre"
+        TextFormat("Joueur: %s | vitesse %.1f | souris %s",
+            GetPlayerMovementModeLabel(player.movementMode),
+            player.moveSpeed,
+            player.mouseLookEnabled ? "capturee" : "libre"
         ),
         16,
         86,
@@ -39,8 +39,8 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     DrawText(
         TextFormat("Collisions: %d boites | rayon joueur %.2f | debug B: %s",
             static_cast<int>(scene.collisionWorld.solidBoxes.size()),
-            cameraController.playerRadius,
-            cameraController.collisionDebugEnabled ? "ON" : "OFF"
+            player.playerRadius,
+            player.collisionDebugEnabled ? "ON" : "OFF"
         ),
         16,
         108,
@@ -49,7 +49,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Demarrage: mode Marche | F = Vol/Marche avec retour instantane au sol",
+        "Architecture: PlayerController pilote la position, Camera3D suit le joueur",
         16,
         130,
         16,
@@ -65,7 +65,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Marche: collisions batiments actives | Vol: E monte, C descend",
+        "F marche/vol | B debug collisions | Shift accelere | Ctrl ralentit | R reset",
         16,
         174,
         16,
@@ -73,7 +73,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "B affiche les boites rouges de collision | Shift accelere | Ctrl ralentit | R reset",
+        "Marche: collisions batiments | Vol: E monte, C descend",
         16,
         196,
         16,
@@ -81,10 +81,10 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        TextFormat("GroundY %.2f | WalkEye %.2f | FlyMin %.2f",
-            cameraController.groundY,
-            cameraController.walkEyeHeight,
-            cameraController.flyMinEyeHeight
+        TextFormat("Position: %.2f, %.2f, %.2f",
+            player.position.x,
+            player.position.y,
+            player.position.z
         ),
         16,
         218,
