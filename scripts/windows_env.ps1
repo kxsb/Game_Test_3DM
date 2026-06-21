@@ -31,16 +31,26 @@ function Find-MontpellierProjectRoot {
 function Initialize-MontpellierWindowsDevEnv {
     param([switch]$Quiet)
 
-    Add-PathFront "$env:WINDIR\System32"
-    Add-PathFront "$env:WINDIR"
-    Add-PathFront "$env:WINDIR\System32\WindowsPowerShell\v1.0"
-    Add-PathFront "C:\Program Files\Git\cmd"
-    Add-PathFront "C:\Program Files\Git\bin"
+    $SystemRoot = $env:SystemRoot
+    if (-not $SystemRoot) {
+        $SystemRoot = "C:\Windows"
+    }
+
+    $BasePathParts = @(
+        "$SystemRoot\System32",
+        "$SystemRoot",
+        "$SystemRoot\System32\WindowsPowerShell\v1.0",
+        "C:\Program Files\PowerShell\7",
+        "C:\Program Files\Git\cmd",
+        "C:\Program Files\Git\bin"
+    )
+
+    foreach ($PathPart in $BasePathParts) {
+        Add-PathFront $PathPart
+    }
 
     $ProjectRoot = Find-MontpellierProjectRoot
     Set-Location $ProjectRoot
-
-    $OriginalPath = $env:Path
 
     $VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     if (-not (Test-Path $VsWhere)) {
@@ -57,9 +67,18 @@ function Initialize-MontpellierWindowsDevEnv {
         throw "VsDevCmd.bat introuvable : $VsDevCmd"
     }
 
-    $env:Path = "$env:WINDIR\System32;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;$OriginalPath"
+    $CmdExe = Join-Path $SystemRoot "System32\cmd.exe"
+    $EnvBootstrapPath = @(
+        "$SystemRoot\System32",
+        "$SystemRoot",
+        "$SystemRoot\System32\WindowsPowerShell\v1.0",
+        "C:\Program Files\Git\cmd",
+        "C:\Program Files\Git\bin"
+    ) -join ';'
 
-    cmd /c "`"$VsDevCmd`" -arch=x64 -host_arch=x64 >nul && set" |
+    $VsCommand = 'set "PATH=' + $EnvBootstrapPath + ';%PATH%" && call "' + $VsDevCmd + '" -arch=x64 -host_arch=x64 >nul && set'
+
+    & $CmdExe /d /s /c $VsCommand |
         ForEach-Object {
             if ($_ -match "^(.*?)=(.*)$") {
                 Set-Item -Path "Env:\$($matches[1])" -Value $matches[2]
@@ -69,10 +88,10 @@ function Initialize-MontpellierWindowsDevEnv {
     $CMakeDir = Join-Path $VsPath "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin"
     $NinjaDir = Join-Path $VsPath "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja"
 
-    Add-PathFront "$env:WINDIR\System32"
-    Add-PathFront "$env:WINDIR"
-    Add-PathFront "C:\Program Files\Git\cmd"
-    Add-PathFront "C:\Program Files\Git\bin"
+    foreach ($PathPart in $BasePathParts) {
+        Add-PathFront $PathPart
+    }
+
     Add-PathFront $CMakeDir
     Add-PathFront $NinjaDir
 

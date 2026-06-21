@@ -4,7 +4,7 @@
 #include "raylib.h"
 
 void DrawHud(const Scene& scene, const CameraControllerState& cameraController) {
-    DrawRectangle(8, 8, 760, 212, Fade(RAYWHITE, 0.88f));
+    DrawRectangle(8, 8, 780, 234, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
 
@@ -37,9 +37,10 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        TextFormat("Collisions: %d boites | rayon joueur %.2f",
+        TextFormat("Collisions: %d boites | rayon joueur %.2f | debug B: %s",
             static_cast<int>(scene.collisionWorld.solidBoxes.size()),
-            cameraController.playerRadius
+            cameraController.playerRadius,
+            cameraController.collisionDebugEnabled ? "ON" : "OFF"
         ),
         16,
         108,
@@ -48,7 +49,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | F vol/marche",
+        "Demarrage: mode Marche | F = Vol/Marche avec retour instantane au sol",
         16,
         130,
         16,
@@ -56,7 +57,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Marche: collision batiments active | Vol: collision sol minimale",
+        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | TAB souris",
         16,
         152,
         16,
@@ -64,9 +65,17 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Vol: E monte, C descend | Shift accelere | Ctrl ralentit | R reset",
+        "Marche: collisions batiments actives | Vol: E monte, C descend",
         16,
         174,
+        16,
+        GRAY
+    );
+
+    DrawText(
+        "B affiche les boites rouges de collision | Shift accelere | Ctrl ralentit | R reset",
+        16,
+        196,
         16,
         GRAY
     );
@@ -78,10 +87,10 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
             cameraController.flyMinEyeHeight
         ),
         16,
-        196,
+        218,
         16,
         GRAY
     );
 
-    DrawFPS(16, 224);
+    DrawFPS(16, 246);
 }

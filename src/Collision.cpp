@@ -1,5 +1,7 @@
 ﻿#include "Collision.h"
 
+#include "raymath.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -24,7 +26,7 @@ namespace {
         const float dx = eyePosition.x - nearestX;
         const float dz = eyePosition.z - nearestZ;
 
-        return (dx * dx + dz * dz) < (body.radius * body.radius);
+        return (dx * dx + dz * dz) <= (body.radius * body.radius);
     }
 
     bool PlayerVerticalOverlapsBox(
@@ -38,7 +40,32 @@ namespace {
         const float boxMinY = box.center.y - box.size.y * 0.5f;
         const float boxMaxY = box.center.y + box.size.y * 0.5f;
 
-        return playerMaxY > boxMinY && playerMinY < boxMaxY;
+        return playerMaxY >= boxMinY && playerMinY <= boxMaxY;
+    }
+
+    Vector3 ResolveWalkMovementStep(
+        Vector3 eyePosition,
+        Vector3 movement,
+        const PlayerCollisionBody& body,
+        const CollisionWorld& world
+    ) {
+        Vector3 resolved = eyePosition;
+
+        Vector3 tryX = resolved;
+        tryX.x += movement.x;
+
+        if (!IsPlayerCollidingAtPosition(tryX, body, world)) {
+            resolved.x = tryX.x;
+        }
+
+        Vector3 tryZ = resolved;
+        tryZ.z += movement.z;
+
+        if (!IsPlayerCollidingAtPosition(tryZ, body, world)) {
+            resolved.z = tryZ.z;
+        }
+
+        return resolved;
     }
 }
 
@@ -73,23 +100,29 @@ Vector3 ResolveWalkMovement(
     const PlayerCollisionBody& body,
     const CollisionWorld& world
 ) {
-    Vector3 resolved = eyePosition;
+    const float movementLength = Vector3Length(movement);
 
-    // Résolution axe par axe : cela donne une glisse simple le long des murs,
-    // au lieu de bloquer tout le mouvement diagonal.
-    Vector3 tryX = resolved;
-    tryX.x += movement.x;
-
-    if (!IsPlayerCollidingAtPosition(tryX, body, world)) {
-        resolved.x = tryX.x;
+    if (movementLength <= 0.0001f) {
+        return eyePosition;
     }
 
-    Vector3 tryZ = resolved;
-    tryZ.z += movement.z;
+    // Anti-tunneling simple : on découpe les mouvements en petits pas.
+    // Cela évite de traverser un bâtiment lorsque la vitesse est élevée.
+    const float maxStep = std::max(0.05f, body.radius * 0.35f);
+    const int steps = std::max(1, static_cast<int>(std::ceil(movementLength / maxStep)));
 
-    if (!IsPlayerCollidingAtPosition(tryZ, body, world)) {
-        resolved.z = tryZ.z;
+    Vector3 stepMovement = Vector3Scale(movement, 1.0f / static_cast<float>(steps));
+    Vector3 resolved = eyePosition;
+
+    for (int i = 0; i < steps; ++i) {
+        resolved = ResolveWalkMovementStep(resolved, stepMovement, body, world);
     }
 
     return resolved;
+}
+
+void DrawCollisionWorldDebug(const CollisionWorld& world) {
+    for (const CollisionBox& box : world.solidBoxes) {
+        DrawCubeWiresV(box.center, box.size, RED);
+    }
 }

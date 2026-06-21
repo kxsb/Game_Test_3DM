@@ -7,25 +7,25 @@ namespace AppConfig {
     constexpr int ScreenHeight = 720;
 
     constexpr const char* WindowTitle = "Montpellier 3D Prototype";
-    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1E";
+    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1E-FIX1";
     constexpr const char* DefaultModelPath = "assets/models/example.glb";
 
     constexpr int TargetFps = 60;
 
-    constexpr Vector3 InitialCameraPosition = { 18.0f, 14.0f, 18.0f };
-    constexpr Vector3 InitialCameraTarget = { 0.0f, 2.0f, 0.0f };
+    constexpr Vector3 InitialCameraPosition = { 18.0f, 1.75f, 18.0f };
+    constexpr Vector3 InitialCameraTarget = { 0.0f, 1.75f, 0.0f };
     constexpr Vector3 CameraUp = { 0.0f, 1.0f, 0.0f };
 
     constexpr float CameraFovY = 45.0f;
 
-    constexpr float InitialMoveSpeed = 9.0f;
+    constexpr float InitialMoveSpeed = 6.0f;
     constexpr float MouseSensitivity = 0.0030f;
 
     constexpr float GroundY = 0.0f;
     constexpr float WalkEyeHeight = 1.75f;
     constexpr float FlyMinEyeHeight = 0.35f;
 
-    constexpr float PlayerRadius = 0.35f;
+    constexpr float PlayerRadius = 0.55f;
     constexpr float PlayerBodyHeight = 1.75f;
 
     constexpr int GridSlices = 40;

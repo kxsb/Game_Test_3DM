@@ -65,6 +65,22 @@ namespace {
         return body;
     }
 
+    void EnterWalkMode(Camera3D* camera, CameraControllerState* state, const CollisionWorld& world) {
+        state->movementMode = CameraMovementMode::Walk;
+        camera->position.y = WalkEyeY(state, world);
+        camera->target = Vector3Add(camera->position, ForwardFromAngles(state->yaw, state->pitch));
+    }
+
+    void EnterFlyMode(Camera3D* camera, CameraControllerState* state, const CollisionWorld& world) {
+        state->movementMode = CameraMovementMode::Fly;
+
+        if (camera->position.y < FlyMinY(state, world)) {
+            camera->position.y = FlyMinY(state, world);
+        }
+
+        camera->target = Vector3Add(camera->position, ForwardFromAngles(state->yaw, state->pitch));
+    }
+
     void ApplyGroundConstraint(Camera3D* camera, const CameraControllerState* state, const CollisionWorld& world) {
         if (state->movementMode == CameraMovementMode::Walk) {
             camera->position.y = WalkEyeY(state, world);
@@ -105,7 +121,10 @@ CameraControllerState CreateCameraController(const Camera3D& camera) {
     state.playerBodyHeight = AppConfig::PlayerBodyHeight;
 
     state.mouseLookEnabled = true;
-    state.movementMode = CameraMovementMode::Fly;
+    state.collisionDebugEnabled = false;
+
+    // On démarre en marche pour que les collisions soient testables immédiatement.
+    state.movementMode = CameraMovementMode::Walk;
 
     Vector3 direction = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
 
@@ -131,22 +150,30 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state, cons
         }
     }
 
+    if (IsKeyPressed(KEY_B)) {
+        state->collisionDebugEnabled = !state->collisionDebugEnabled;
+    }
+
     if (IsKeyPressed(KEY_F)) {
-        if (state->movementMode == CameraMovementMode::Fly) {
-            state->movementMode = CameraMovementMode::Walk;
+        if (state->movementMode == CameraMovementMode::Walk) {
+            EnterFlyMode(camera, state, world);
         }
         else {
-            state->movementMode = CameraMovementMode::Fly;
+            EnterWalkMode(camera, state, world);
         }
-
-        ApplyGroundConstraint(camera, state, world);
     }
 
     if (IsKeyPressed(KEY_R)) {
         camera->position = state->initialPosition;
         camera->target = state->initialTarget;
         UpdateAnglesFromCamera(camera, state);
-        ApplyGroundConstraint(camera, state, world);
+
+        if (state->movementMode == CameraMovementMode::Walk) {
+            EnterWalkMode(camera, state, world);
+        }
+        else {
+            EnterFlyMode(camera, state, world);
+        }
     }
 
     const float wheel = GetMouseWheelMove();

@@ -15,7 +15,7 @@ struct CollisionWorld {
 };
 
 struct PlayerCollisionBody {
-    float radius = 0.35f;
+    float radius = 0.55f;
     float height = 1.75f;
     float eyeHeight = 1.75f;
 };
@@ -34,3 +34,5 @@ Vector3 ResolveWalkMovement(
     const PlayerCollisionBody& body,
     const CollisionWorld& world
 );
+
+void DrawCollisionWorldDebug(const CollisionWorld& world);

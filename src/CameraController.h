@@ -25,6 +25,7 @@ struct CameraControllerState {
     float playerBodyHeight;
 
     bool mouseLookEnabled;
+    bool collisionDebugEnabled;
 
     CameraMovementMode movementMode;
 };

@@ -46,6 +46,11 @@ int RunGame(int argc, char** argv) {
 
         BeginMode3D(camera);
         DrawScene(scene);
+
+        if (cameraController.collisionDebugEnabled) {
+            DrawCollisionWorldDebug(scene.collisionWorld);
+        }
+
         EndMode3D();
 
         DrawHud(scene, cameraController);
@@ -60,4 +65,3 @@ int RunGame(int argc, char** argv) {
 
     return 0;
 }
-
