@@ -7,7 +7,7 @@ namespace AppConfig {
     constexpr int ScreenHeight = 720;
 
     constexpr const char* WindowTitle = "Montpellier 3D Prototype";
-    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1D-FIX1";
+    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1E";
     constexpr const char* DefaultModelPath = "assets/models/example.glb";
 
     constexpr int TargetFps = 60;
@@ -24,6 +24,9 @@ namespace AppConfig {
     constexpr float GroundY = 0.0f;
     constexpr float WalkEyeHeight = 1.75f;
     constexpr float FlyMinEyeHeight = 0.35f;
+
+    constexpr float PlayerRadius = 0.35f;
+    constexpr float PlayerBodyHeight = 1.75f;
 
     constexpr int GridSlices = 40;
     constexpr float GridSpacing = 1.0f;

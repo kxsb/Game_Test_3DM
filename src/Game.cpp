@@ -39,7 +39,7 @@ int RunGame(int argc, char** argv) {
     LoadScene(&scene, ResolveModelPath(argc, argv));
 
     while (!WindowShouldClose()) {
-        UpdateCameraController(&camera, &cameraController);
+        UpdateCameraController(&camera, &cameraController, scene.collisionWorld);
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -60,3 +60,4 @@ int RunGame(int argc, char** argv) {
 
     return 0;
 }
+

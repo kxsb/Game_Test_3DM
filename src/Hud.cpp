@@ -4,7 +4,7 @@
 #include "raylib.h"
 
 void DrawHud(const Scene& scene, const CameraControllerState& cameraController) {
-    DrawRectangle(8, 8, 740, 190, Fade(RAYWHITE, 0.88f));
+    DrawRectangle(8, 8, 760, 212, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
 
@@ -37,7 +37,10 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | F vol/marche",
+        TextFormat("Collisions: %d boites | rayon joueur %.2f",
+            static_cast<int>(scene.collisionWorld.solidBoxes.size()),
+            cameraController.playerRadius
+        ),
         16,
         108,
         16,
@@ -45,7 +48,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Sol: collision simple active | Marche: hauteur humaine fixe",
+        "Deplacement: ZQSD/WASD | D droite | Q/A gauche | F vol/marche",
         16,
         130,
         16,
@@ -53,9 +56,17 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Vol: E monte, C descend, sans passer sous le sol | Shift accelere | Ctrl ralentit | R reset",
+        "Marche: collision batiments active | Vol: collision sol minimale",
         16,
         152,
+        16,
+        GRAY
+    );
+
+    DrawText(
+        "Vol: E monte, C descend | Shift accelere | Ctrl ralentit | R reset",
+        16,
+        174,
         16,
         GRAY
     );
@@ -67,10 +78,10 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
             cameraController.flyMinEyeHeight
         ),
         16,
-        174,
+        196,
         16,
         GRAY
     );
 
-    DrawFPS(16, 202);
+    DrawFPS(16, 224);
 }

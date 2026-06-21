@@ -33,8 +33,6 @@ namespace {
     }
 
     Vector3 RightFromFlatForward(Vector3 flatForward) {
-        // Main droite corrigée pour le repère raylib utilisé ici.
-        // Avant : { flatForward.z, 0, -flatForward.x }, ce qui inversait droite/gauche.
         Vector3 right = {
             -flatForward.z,
             0.0f,
@@ -51,22 +49,30 @@ namespace {
         state->pitch = std::asin(ClampFloat(direction.y, -1.0f, 1.0f));
     }
 
-    float WalkEyeY(const CameraControllerState* state) {
-        return state->groundY + state->walkEyeHeight;
+    float WalkEyeY(const CameraControllerState* state, const CollisionWorld& world) {
+        return world.groundY + state->walkEyeHeight;
     }
 
-    float FlyMinY(const CameraControllerState* state) {
-        return state->groundY + state->flyMinEyeHeight;
+    float FlyMinY(const CameraControllerState* state, const CollisionWorld& world) {
+        return world.groundY + state->flyMinEyeHeight;
     }
 
-    void ApplyGroundConstraint(Camera3D* camera, const CameraControllerState* state) {
+    PlayerCollisionBody CreatePlayerBody(const CameraControllerState* state) {
+        PlayerCollisionBody body = {};
+        body.radius = state->playerRadius;
+        body.height = state->playerBodyHeight;
+        body.eyeHeight = state->walkEyeHeight;
+        return body;
+    }
+
+    void ApplyGroundConstraint(Camera3D* camera, const CameraControllerState* state, const CollisionWorld& world) {
         if (state->movementMode == CameraMovementMode::Walk) {
-            camera->position.y = WalkEyeY(state);
+            camera->position.y = WalkEyeY(state, world);
             return;
         }
 
-        if (camera->position.y < FlyMinY(state)) {
-            camera->position.y = FlyMinY(state);
+        if (camera->position.y < FlyMinY(state, world)) {
+            camera->position.y = FlyMinY(state, world);
         }
     }
 }
@@ -95,6 +101,9 @@ CameraControllerState CreateCameraController(const Camera3D& camera) {
     state.walkEyeHeight = AppConfig::WalkEyeHeight;
     state.flyMinEyeHeight = AppConfig::FlyMinEyeHeight;
 
+    state.playerRadius = AppConfig::PlayerRadius;
+    state.playerBodyHeight = AppConfig::PlayerBodyHeight;
+
     state.mouseLookEnabled = true;
     state.movementMode = CameraMovementMode::Fly;
 
@@ -108,7 +117,7 @@ CameraControllerState CreateCameraController(const Camera3D& camera) {
     return state;
 }
 
-void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
+void UpdateCameraController(Camera3D* camera, CameraControllerState* state, const CollisionWorld& world) {
     const float dt = GetFrameTime();
 
     if (IsKeyPressed(KEY_TAB)) {
@@ -130,14 +139,14 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
             state->movementMode = CameraMovementMode::Fly;
         }
 
-        ApplyGroundConstraint(camera, state);
+        ApplyGroundConstraint(camera, state, world);
     }
 
     if (IsKeyPressed(KEY_R)) {
         camera->position = state->initialPosition;
         camera->target = state->initialTarget;
         UpdateAnglesFromCamera(camera, state);
-        ApplyGroundConstraint(camera, state);
+        ApplyGroundConstraint(camera, state, world);
     }
 
     const float wheel = GetMouseWheelMove();
@@ -171,8 +180,6 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
 
     Vector3 movement = { 0.0f, 0.0f, 0.0f };
 
-    // AZERTY + QWERTY friendly:
-    // Z/W forward, S backward, Q/A left, D right.
     if (IsKeyDown(KEY_W) || IsKeyDown(KEY_Z)) {
         movement = Vector3Add(movement, flatForward);
     }
@@ -201,10 +208,17 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
 
     if (Vector3Length(movement) > 0.0001f) {
         movement = Vector3Scale(Vector3Normalize(movement), speed * dt);
-        camera->position = Vector3Add(camera->position, movement);
+
+        if (state->movementMode == CameraMovementMode::Walk) {
+            PlayerCollisionBody body = CreatePlayerBody(state);
+            camera->position = ResolveWalkMovement(camera->position, movement, body, world);
+        }
+        else {
+            camera->position = Vector3Add(camera->position, movement);
+        }
     }
 
-    ApplyGroundConstraint(camera, state);
+    ApplyGroundConstraint(camera, state, world);
 
     camera->target = Vector3Add(camera->position, forward);
 }

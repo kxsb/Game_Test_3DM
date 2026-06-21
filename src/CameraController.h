@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "Collision.h"
 #include "raylib.h"
 
 enum class CameraMovementMode {
@@ -20,12 +21,15 @@ struct CameraControllerState {
     float walkEyeHeight;
     float flyMinEyeHeight;
 
+    float playerRadius;
+    float playerBodyHeight;
+
     bool mouseLookEnabled;
 
     CameraMovementMode movementMode;
 };
 
 CameraControllerState CreateCameraController(const Camera3D& camera);
-void UpdateCameraController(Camera3D* camera, CameraControllerState* state);
+void UpdateCameraController(Camera3D* camera, CameraControllerState* state, const CollisionWorld& world);
 
 const char* GetCameraMovementModeLabel(CameraMovementMode mode);
