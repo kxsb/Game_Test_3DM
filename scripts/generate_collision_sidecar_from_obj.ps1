@@ -4,15 +4,15 @@ param(
 
     [string]$OutputPath = "",
 
-    [double]$CellSize = 2.0,
+    [double]$CellSize = 6.0,
 
     [double]$MinWallHeight = 1.8,
 
     [double]$MinColumnHeight = 1.5,
 
-    [double]$ColumnPadding = 0.10,
+    [double]$ColumnPadding = 0.15,
 
-    [int]$MaxBoxes = 12000
+    [int]$MaxBoxes = 4000
 )
 
 $ErrorActionPreference = "Stop"
@@ -57,6 +57,15 @@ function Get-Max3 {
     return [Math]::Max([Math]::Max($A, $B), $C)
 }
 
+function Get-CellKey {
+    param(
+        [int]$Ix,
+        [int]$Iz
+    )
+
+    return "$Ix`:$Iz"
+}
+
 function Add-CellOccupation {
     param(
         [hashtable]$Cells,
@@ -66,7 +75,7 @@ function Add-CellOccupation {
         [double]$MaxY
     )
 
-    $key = "$Ix`:$Iz"
+    $key = Get-CellKey -Ix $Ix -Iz $Iz
 
     if (-not $Cells.ContainsKey($key)) {
         $Cells[$key] = [pscustomobject]@{
@@ -107,11 +116,11 @@ function Add-TriangleToCollisionGrid {
 
     $height = $maxY - $minY
 
-    # On ne garde que les faces qui montent suffisamment.
-    # Cela élimine la plupart des sols, toits plats, corniches et détails horizontaux.
     if ($height -lt $script:MinimumWallHeight) {
         return
     }
+
+    $script:ContributingTriangles++
 
     $minIx = [Math]::Floor($minX / $script:GridCellSize)
     $maxIx = [Math]::Floor($maxX / $script:GridCellSize)
@@ -131,6 +140,149 @@ function Add-TriangleToCollisionGrid {
     }
 }
 
+function Get-NextRemainingCell {
+    param([hashtable]$Remaining)
+
+    $best = $null
+
+    foreach ($cell in $Remaining.Values) {
+        if ($null -eq $best) {
+            $best = $cell
+            continue
+        }
+
+        if ($cell.Iz -lt $best.Iz) {
+            $best = $cell
+            continue
+        }
+
+        if ($cell.Iz -eq $best.Iz -and $cell.Ix -lt $best.Ix) {
+            $best = $cell
+        }
+    }
+
+    return $best
+}
+
+function Convert-GridToMergedBoxes {
+    param(
+        [hashtable]$Cells,
+        [double]$CellSize,
+        [double]$MinColumnHeight,
+        [double]$Padding,
+        [int]$MaxBoxes
+    )
+
+    $remaining = @{}
+
+    foreach ($entry in $Cells.GetEnumerator()) {
+        $remaining[$entry.Key] = $entry.Value
+    }
+
+    $boxes = New-Object System.Collections.Generic.List[object]
+
+    while ($remaining.Count -gt 0) {
+        if ($boxes.Count -ge $MaxBoxes) {
+            break
+        }
+
+        $start = Get-NextRemainingCell -Remaining $remaining
+
+        if ($null -eq $start) {
+            break
+        }
+
+        $widthCells = 1
+
+        while ($true) {
+            $nextIx = $start.Ix + $widthCells
+            $key = Get-CellKey -Ix $nextIx -Iz $start.Iz
+
+            if ($remaining.ContainsKey($key)) {
+                $widthCells++
+            }
+            else {
+                break
+            }
+        }
+
+        $depthCells = 1
+
+        while ($true) {
+            $nextIz = $start.Iz + $depthCells
+            $rowOk = $true
+
+            for ($dx = 0; $dx -lt $widthCells; $dx++) {
+                $key = Get-CellKey -Ix ($start.Ix + $dx) -Iz $nextIz
+
+                if (-not $remaining.ContainsKey($key)) {
+                    $rowOk = $false
+                    break
+                }
+            }
+
+            if ($rowOk) {
+                $depthCells++
+            }
+            else {
+                break
+            }
+        }
+
+        $minY = [double]::PositiveInfinity
+        $maxY = [double]::NegativeInfinity
+
+        for ($dz = 0; $dz -lt $depthCells; $dz++) {
+            for ($dx = 0; $dx -lt $widthCells; $dx++) {
+                $key = Get-CellKey -Ix ($start.Ix + $dx) -Iz ($start.Iz + $dz)
+                $cell = $remaining[$key]
+
+                if ($cell.MinY -lt $minY) {
+                    $minY = $cell.MinY
+                }
+
+                if ($cell.MaxY -gt $maxY) {
+                    $maxY = $cell.MaxY
+                }
+            }
+        }
+
+        for ($dz = 0; $dz -lt $depthCells; $dz++) {
+            for ($dx = 0; $dx -lt $widthCells; $dx++) {
+                $key = Get-CellKey -Ix ($start.Ix + $dx) -Iz ($start.Iz + $dz)
+                $remaining.Remove($key)
+            }
+        }
+
+        $height = $maxY - $minY
+
+        if ($height -lt $MinColumnHeight) {
+            continue
+        }
+
+        $centerX = ($start.Ix + ($widthCells / 2.0)) * $CellSize
+        $centerZ = ($start.Iz + ($depthCells / 2.0)) * $CellSize
+        $centerY = ($minY + $maxY) / 2.0
+
+        $sizeX = ($widthCells * $CellSize) + $Padding
+        $sizeY = $height
+        $sizeZ = ($depthCells * $CellSize) + $Padding
+
+        $boxes.Add([pscustomobject]@{
+            CenterX = $centerX
+            CenterY = $centerY
+            CenterZ = $centerZ
+            SizeX = $sizeX
+            SizeY = $sizeY
+            SizeZ = $sizeZ
+            WidthCells = $widthCells
+            DepthCells = $depthCells
+        })
+    }
+
+    return $boxes
+}
+
 if (-not (Test-Path $Path)) {
     throw "OBJ not found: $Path"
 }
@@ -144,9 +296,9 @@ $cells = @{}
 
 $script:GridCellSize = $CellSize
 $script:MinimumWallHeight = $MinWallHeight
+$script:ContributingTriangles = 0
 
 $faceCount = 0
-$usedFaceCount = 0
 
 $reader = [System.IO.StreamReader]::new((Resolve-Path $Path).Path)
 
@@ -205,17 +357,11 @@ try {
                     continue
                 }
 
-                $beforeCount = $cells.Count
-
                 Add-TriangleToCollisionGrid `
                     -A $vertices[$aIndex] `
                     -B $vertices[$bIndex] `
                     -C $vertices[$cIndex] `
                     -Cells $cells
-
-                if ($cells.Count -gt $beforeCount) {
-                    $usedFaceCount++
-                }
 
                 $faceCount++
             }
@@ -226,8 +372,15 @@ finally {
     $reader.Close()
 }
 
+$boxes = Convert-GridToMergedBoxes `
+    -Cells $cells `
+    -CellSize $CellSize `
+    -MinColumnHeight $MinColumnHeight `
+    -Padding $ColumnPadding `
+    -MaxBoxes $MaxBoxes
+
 $collisionLines = New-Object System.Collections.Generic.List[string]
-$collisionLines.Add("# Montpellier Game collision sidecar generated from OBJ grid")
+$collisionLines.Add("# Montpellier Game collision sidecar generated from OBJ merged grid")
 $collisionLines.Add("# Format: box cx cy cz sx sy sz")
 $collisionLines.Add("# Source OBJ: $Path")
 $collisionLines.Add("# CellSize: $CellSize")
@@ -235,44 +388,20 @@ $collisionLines.Add("# MinWallHeight: $MinWallHeight")
 $collisionLines.Add("# MinColumnHeight: $MinColumnHeight")
 $collisionLines.Add("# ColumnPadding: $ColumnPadding")
 
-$boxCount = 0
-
-foreach ($entry in $cells.GetEnumerator() | Sort-Object Name) {
-    if ($boxCount -ge $MaxBoxes) {
-        break
-    }
-
-    $cell = $entry.Value
-    $height = $cell.MaxY - $cell.MinY
-
-    if ($height -lt $MinColumnHeight) {
-        continue
-    }
-
-    $centerX = (($cell.Ix + 0.5) * $CellSize)
-    $centerZ = (($cell.Iz + 0.5) * $CellSize)
-
-    $centerY = ($cell.MinY + $cell.MaxY) / 2.0
-
-    $sizeX = $CellSize + $ColumnPadding
-    $sizeY = $height
-    $sizeZ = $CellSize + $ColumnPadding
-
+foreach ($box in $boxes) {
     $collisionLines.Add(
-        "box $(ConvertTo-InvariantFloat $centerX) $(ConvertTo-InvariantFloat $centerY) $(ConvertTo-InvariantFloat $centerZ) $(ConvertTo-InvariantFloat $sizeX) $(ConvertTo-InvariantFloat $sizeY) $(ConvertTo-InvariantFloat $sizeZ)"
+        "box $(ConvertTo-InvariantFloat $box.CenterX) $(ConvertTo-InvariantFloat $box.CenterY) $(ConvertTo-InvariantFloat $box.CenterZ) $(ConvertTo-InvariantFloat $box.SizeX) $(ConvertTo-InvariantFloat $box.SizeY) $(ConvertTo-InvariantFloat $box.SizeZ)"
     )
-
-    $boxCount++
 }
 
 Set-Content -Path $OutputPath -Value $collisionLines -Encoding ASCII
 
-Write-Host "=== COLLISION SIDECAR FROM OBJ GRID ==="
+Write-Host "=== COLLISION SIDECAR FROM OBJ MERGED GRID ==="
 Write-Host "Source OBJ : $Path"
 Write-Host "Output : $OutputPath"
 Write-Host "Vertices read : $($vertices.Count)"
 Write-Host "Triangles scanned : $faceCount"
-Write-Host "Faces contributing : $usedFaceCount"
-Write-Host "Occupied cells : $($cells.Count)"
-Write-Host "Collision boxes : $boxCount"
+Write-Host "Triangles contributing : $ContributingTriangles"
+Write-Host "Occupied cells before merge : $($cells.Count)"
+Write-Host "Collision boxes after merge : $($boxes.Count)"
 Write-Host "Cell size : $CellSize"
