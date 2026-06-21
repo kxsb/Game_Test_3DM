@@ -7,6 +7,8 @@
 
 #include "raylib.h"
 
+#include <cstring>
+
 namespace {
     Camera3D CreateInitialCamera() {
         Camera3D camera = {};
@@ -28,11 +30,15 @@ namespace {
 
     const char* ResolvePhotoModelPath(int argc, char** argv) {
         if (argc > 2) {
-            return argv[2];
-        }
+            if (std::strcmp(argv[2], "__none__") == 0) {
+                return nullptr;
+            }
 
-        if (FileExists(AppConfig::DefaultPhotomodelPath)) {
-            return AppConfig::DefaultPhotomodelPath;
+            if (std::strcmp(argv[2], "__default__") == 0) {
+                return AppConfig::DefaultPhotomodelPath;
+            }
+
+            return argv[2];
         }
 
         return nullptr;
@@ -90,6 +96,7 @@ int RunGame(int argc, char** argv) {
 
     return 0;
 }
+
 
 
 

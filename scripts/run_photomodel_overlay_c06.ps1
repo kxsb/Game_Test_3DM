@@ -1,6 +1,6 @@
 ﻿param(
     [string]$CityModel = "assets\models\citygml_tile_centre_w250_d250.obj",
-    [string]$PhotoModel = "data\raw\montpellier\photomodel_exports\C06\C06.obj"
+    [string]$PhotoModel = "data\raw\montpellier\photomodel_exports\C06_minimal\C06_minimal.obj"
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,3 +20,4 @@ Write-Host ""
 Write-Host "Touches : P photo | X CityGML | I/J/K/L/U/O align | +/- scale"
 
 .\build\montpellier.exe $CityModel $PhotoModel
+

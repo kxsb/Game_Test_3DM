@@ -492,7 +492,7 @@ void DrawScene(const Scene& scene) {
             scene.photoModel.model,
             scene.photoModel.position,
             scene.photoModel.scale,
-            WHITE
+            Fade(WHITE, 0.55f)
         );
     }
 }
@@ -584,6 +584,20 @@ void UpdateScenePhotoModelControls(Scene* scene) {
     }
 
     scene->photoModel.scale = std::max(0.05f, scene->photoModel.scale);
+
+    if (IsKeyPressed(KEY_M)) {
+        TraceLog(
+            LOG_INFO,
+            TextFormat(
+                "PHOTO ALIGN offset=(%.3f %.3f %.3f) scale=%.6f path=%s",
+                scene->photoModel.position.x,
+                scene->photoModel.position.y,
+                scene->photoModel.position.z,
+                scene->photoModel.scale,
+                scene->photoModel.path.c_str()
+            )
+        );
+    }
 }
 void UnloadScene(Scene* scene) {
     if (scene->modelLoaded) {
@@ -629,6 +643,7 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
 
 
 

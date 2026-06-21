@@ -134,7 +134,7 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        "Align photo: I/K avant-arriere | J/L gauche-droite | U/O hauteur | +/- echelle",
+        "Align photo: I/K avant-arriere | J/L gauche-droite | U/O hauteur | +/- echelle | M log offset",
         16,
         240,
         16,
@@ -171,6 +171,7 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
 
     DrawFPS(16, 334);
 }
+
 
 
 
