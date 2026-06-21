@@ -106,7 +106,7 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     }
 
     DrawText(
-        "B affiche bounds bleus + collisions rouges",
+        "B affiche bounds bleus + empreintes collisions rouges",
         16,
         196,
         16,
@@ -143,3 +143,4 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
 
     DrawFPS(16, 290);
 }
+

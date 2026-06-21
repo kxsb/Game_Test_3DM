@@ -172,9 +172,41 @@ Vector3 ResolveWalkMovement(
 
 void DrawCollisionWorldDebug(const CollisionWorld& world) {
     for (const CollisionBox& box : world.solidBoxes) {
-        DrawCubeWiresV(box.center, box.size, RED);
+        const float boxMinY = box.center.y - box.size.y * 0.5f;
+
+        // Empreinte au sol : c'est ce qu'on doit comparer aux façades visibles.
+        const float footprintHeight = 0.18f;
+        const Vector3 footprintCenter = {
+            box.center.x,
+            boxMinY + footprintHeight * 0.5f,
+            box.center.z
+        };
+        const Vector3 footprintSize = {
+            box.size.x,
+            footprintHeight,
+            box.size.z
+        };
+
+        DrawCubeWiresV(footprintCenter, footprintSize, RED);
+
+        // Volume bas de lecture : assez haut pour comprendre l'obstacle,
+        // pas assez pour masquer toute la ville avec des cages verticales.
+        const float markerHeight = std::min(box.size.y, 2.0f);
+        const Vector3 lowWallCenter = {
+            box.center.x,
+            boxMinY + markerHeight * 0.5f,
+            box.center.z
+        };
+        const Vector3 lowWallSize = {
+            box.size.x,
+            markerHeight,
+            box.size.z
+        };
+
+        DrawCubeWiresV(lowWallCenter, lowWallSize, Fade(RED, 0.45f));
     }
 }
+
 
 
 
