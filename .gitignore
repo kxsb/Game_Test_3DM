@@ -58,3 +58,5 @@ VilleMTP*/
 *.docx
 assets/models/dxf_sample*.obj
 assets/models/dxf_sample*.collisions.txt
+assets/models/dxf_tile*.obj
+assets/models/dxf_tile*.collisions.txt
