@@ -1,24 +1,27 @@
 ﻿# ================================================================
-# Build / IDE
+# IDE / build
 # ================================================================
+.vs/
+.vscode/.browse.VC.db*
+.vscode/ipch/
+
 build/
 Build/
+out/
 x64/
 x86/
 Debug/
 Release/
 RelWithDebInfo/
 MinSizeRel/
-.vs/
-.vscode/.browse.VC.db*
-.vscode/ipch/
+
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 Makefile
 
 # ================================================================
-# Binaries
+# Binaries / compiled objects
 # ================================================================
 *.exe
 *.dll
@@ -28,18 +31,19 @@ Makefile
 *.dylib
 *.pdb
 *.ilk
-*.obj
+*.idb
+*.ipdb
+*.iobj
 *.o
 
-# Attention :
-# Les fichiers .obj ci-dessus sont ignorés car ce sont souvent des objets compilés.
-# Si tes modèles 3D utilisent aussi l'extension .obj, on les réautorise ci-dessous.
-
+# Les .obj sont souvent des objets compilés,
+# mais ici on autorise les modèles 3D dans assets/.
+*.obj
 !assets/**/*.obj
 !Assets/**/*.obj
 
 # ================================================================
-# Logs / temporary
+# Logs / temp / backups
 # ================================================================
 *.log
 *.tmp
@@ -49,9 +53,6 @@ Makefile
 *.swp
 *.swo
 
-# ================================================================
-# Local audits / backups
-# ================================================================
 _audit*/
 _audit_*/
 _backup*/
