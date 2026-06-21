@@ -354,7 +354,11 @@ void DrawScene(const Scene& scene) {
     }
 
     if (scene.modelLoaded) {
-        DrawModel(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, Color{ 185, 185, 185, 255 });
+        // Color WHITE laisse les matériaux OBJ/MTL faire leur travail.
+        DrawModel(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
+
+        // Contours discrets pour lire les bâtiments et les rues.
+        DrawModelWires(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, Fade(BLACK, 0.22f));
     }
     else {
         DrawProceduralCity(scene.proceduralCity);
@@ -406,6 +410,7 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
 
 
 
