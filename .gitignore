@@ -73,3 +73,6 @@ desktop.ini
 .env.*
 *.secret
 secrets.*
+
+# Heavy local GIS / 3D source data
+data/raw/
