@@ -4,12 +4,12 @@
 #include "raylib.h"
 
 void DrawHud(const Scene& scene, const CameraControllerState& cameraController) {
-    DrawRectangle(8, 8, 650, 146, Fade(RAYWHITE, 0.88f));
+    DrawRectangle(8, 8, 700, 168, Fade(RAYWHITE, 0.88f));
 
     DrawText(AppConfig::PrototypeLabel, 16, 16, 20, DARKGRAY);
 
     DrawText(
-        scene.modelLoaded ? "Mode: modele charge" : "Mode: mini-ville procedurale",
+        scene.modelLoaded ? "Mode scene: modele charge" : "Mode scene: mini-ville procedurale",
         16,
         42,
         16,
@@ -25,7 +25,11 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "Camera: souris + ZQSD/WASD, E monte, C descend",
+        TextFormat("Camera: %s | vitesse %.1f | souris %s",
+            GetCameraMovementModeLabel(cameraController.movementMode),
+            cameraController.moveSpeed,
+            cameraController.mouseLookEnabled ? "capturee" : "libre"
+        ),
         16,
         86,
         16,
@@ -33,7 +37,7 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        "TAB libere/capture souris | molette vitesse | Shift accelere | Ctrl ralentit | R reset",
+        "Deplacement: ZQSD/WASD | F vol/marche | TAB souris | molette vitesse",
         16,
         108,
         16,
@@ -41,12 +45,20 @@ void DrawHud(const Scene& scene, const CameraControllerState& cameraController) 
     );
 
     DrawText(
-        TextFormat("Vitesse: %.1f | Souris: %s", cameraController.moveSpeed, cameraController.mouseLookEnabled ? "capturee" : "libre"),
+        "Vol: E monte, C descend | Shift accelere | Ctrl ralentit | R reset",
         16,
         130,
         16,
         GRAY
     );
 
-    DrawFPS(16, 158);
+    DrawText(
+        "Marche: hauteur humaine fixe, deplacement horizontal",
+        16,
+        152,
+        16,
+        GRAY
+    );
+
+    DrawFPS(16, 180);
 }

@@ -1,4 +1,5 @@
 ﻿#include "CameraController.h"
+#include "AppConfig.h"
 #include "raymath.h"
 
 #include <algorithm>
@@ -17,6 +18,7 @@ namespace {
             std::sin(pitch),
             std::cos(pitch) * std::cos(yaw)
         };
+
         return Vector3Normalize(forward);
     }
 
@@ -26,6 +28,7 @@ namespace {
             0.0f,
             std::cos(yaw)
         };
+
         return Vector3Normalize(forward);
     }
 
@@ -35,19 +38,48 @@ namespace {
             0.0f,
             -flatForward.x
         };
+
         return Vector3Normalize(right);
+    }
+
+    void UpdateAnglesFromCamera(Camera3D* camera, CameraControllerState* state) {
+        Vector3 direction = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+
+        state->yaw = std::atan2(direction.x, direction.z);
+        state->pitch = std::asin(ClampFloat(direction.y, -1.0f, 1.0f));
+    }
+
+    void ApplyWalkHeight(Camera3D* camera, const CameraControllerState* state) {
+        camera->position.y = state->walkEyeHeight;
+    }
+}
+
+const char* GetCameraMovementModeLabel(CameraMovementMode mode) {
+    switch (mode) {
+        case CameraMovementMode::Fly:
+            return "Vol libre";
+        case CameraMovementMode::Walk:
+            return "Marche";
+        default:
+            return "Inconnu";
     }
 }
 
 CameraControllerState CreateCameraController(const Camera3D& camera) {
     CameraControllerState state = {};
+
     state.initialPosition = camera.position;
     state.initialTarget = camera.target;
-    state.moveSpeed = 9.0f;
-    state.mouseSensitivity = 0.0030f;
+
+    state.moveSpeed = AppConfig::InitialMoveSpeed;
+    state.mouseSensitivity = AppConfig::MouseSensitivity;
+    state.walkEyeHeight = AppConfig::WalkEyeHeight;
+
     state.mouseLookEnabled = true;
+    state.movementMode = CameraMovementMode::Fly;
 
     Vector3 direction = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+
     state.yaw = std::atan2(direction.x, direction.z);
     state.pitch = std::asin(ClampFloat(direction.y, -1.0f, 1.0f));
 
@@ -70,22 +102,35 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
         }
     }
 
+    if (IsKeyPressed(KEY_F)) {
+        if (state->movementMode == CameraMovementMode::Fly) {
+            state->movementMode = CameraMovementMode::Walk;
+            ApplyWalkHeight(camera, state);
+        }
+        else {
+            state->movementMode = CameraMovementMode::Fly;
+        }
+    }
+
     if (IsKeyPressed(KEY_R)) {
         camera->position = state->initialPosition;
         camera->target = state->initialTarget;
+        UpdateAnglesFromCamera(camera, state);
 
-        Vector3 direction = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
-        state->yaw = std::atan2(direction.x, direction.z);
-        state->pitch = std::asin(ClampFloat(direction.y, -1.0f, 1.0f));
+        if (state->movementMode == CameraMovementMode::Walk) {
+            ApplyWalkHeight(camera, state);
+        }
     }
 
     const float wheel = GetMouseWheelMove();
+
     if (wheel != 0.0f) {
         state->moveSpeed = ClampFloat(state->moveSpeed + wheel * 1.5f, 1.0f, 80.0f);
     }
 
     if (state->mouseLookEnabled) {
         Vector2 delta = GetMouseDelta();
+
         state->yaw -= delta.x * state->mouseSensitivity;
         state->pitch -= delta.y * state->mouseSensitivity;
         state->pitch = ClampFloat(state->pitch, -Pi * 0.48f, Pi * 0.48f);
@@ -113,27 +158,36 @@ void UpdateCameraController(Camera3D* camera, CameraControllerState* state) {
     if (IsKeyDown(KEY_W) || IsKeyDown(KEY_Z)) {
         movement = Vector3Add(movement, flatForward);
     }
+
     if (IsKeyDown(KEY_S)) {
         movement = Vector3Subtract(movement, flatForward);
     }
+
     if (IsKeyDown(KEY_D)) {
         movement = Vector3Add(movement, right);
     }
+
     if (IsKeyDown(KEY_A) || IsKeyDown(KEY_Q)) {
         movement = Vector3Subtract(movement, right);
     }
 
-    // Vertical movement.
-    if (IsKeyDown(KEY_E)) {
-        movement = Vector3Add(movement, up);
-    }
-    if (IsKeyDown(KEY_C)) {
-        movement = Vector3Subtract(movement, up);
+    if (state->movementMode == CameraMovementMode::Fly) {
+        if (IsKeyDown(KEY_E)) {
+            movement = Vector3Add(movement, up);
+        }
+
+        if (IsKeyDown(KEY_C)) {
+            movement = Vector3Subtract(movement, up);
+        }
     }
 
     if (Vector3Length(movement) > 0.0001f) {
         movement = Vector3Scale(Vector3Normalize(movement), speed * dt);
         camera->position = Vector3Add(camera->position, movement);
+    }
+
+    if (state->movementMode == CameraMovementMode::Walk) {
+        ApplyWalkHeight(camera, state);
     }
 
     camera->target = Vector3Add(camera->position, forward);
