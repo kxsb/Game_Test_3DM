@@ -48,3 +48,13 @@ Thumbs.db
 
 # Generated collision sidecars
 assets/models/*.collisions.txt
+# Local heavy Montpellier source data
+montpellier_game/
+/montpellier_game/
+VilleMTP*/
+**/VilleMTP*/
+*Modele3D*/
+**/*Modele3D*/
+*.docx
+assets/models/dxf_sample*.obj
+assets/models/dxf_sample*.collisions.txt
