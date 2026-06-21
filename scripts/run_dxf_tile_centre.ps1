@@ -3,18 +3,31 @@
     [double]$Depth = 250,
     [int]$MaxFaces = 50000,
     [string]$DxfPath = "..\VilleMTP_MTP_Modele3D\Centre_BATIMENTS_2016.dxf",
-    [string]$OutputPath = "assets\models\dxf_tile_centre.obj",
+    [string]$OutputPath = "",
     [double]$CenterX = [double]::NaN,
     [double]$CenterY = [double]::NaN,
+
     [switch]$NoCollisions,
-    [double]$CollisionCellSize = 2.0,
+
+    [double]$CollisionCellSize = 6.0,
     [double]$CollisionMinWallHeight = 1.8,
     [double]$CollisionMinColumnHeight = 1.5,
-    [double]$CollisionColumnPadding = 0.10,
-    [int]$CollisionMaxBoxes = 12000
+    [double]$CollisionColumnPadding = 0.15,
+    [int]$CollisionMaxBoxes = 4000,
+
+    [switch]$ForceExtract,
+    [switch]$ForceCollisions,
+    [switch]$NoRun
 )
 
 $ErrorActionPreference = "Stop"
+$InvariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
+
+function ConvertTo-FileNumber {
+    param([double]$Value)
+
+    return $Value.ToString("0.###", $InvariantCulture).Replace(".", "p").Replace("-", "m")
+}
 
 if (-not (Test-Path $DxfPath)) {
     throw "DXF not found: $DxfPath"
@@ -32,50 +45,90 @@ if (-not (Test-Path $RunScript)) {
     throw "Run script not found: $RunScript"
 }
 
+if (-not $OutputPath) {
+    $widthSlug = ConvertTo-FileNumber $Width
+    $depthSlug = ConvertTo-FileNumber $Depth
+    $cellSlug = ConvertTo-FileNumber $CollisionCellSize
+
+    $OutputPath = "assets\models\dxf_tile_centre_w${widthSlug}_d${depthSlug}_c${cellSlug}.obj"
+}
+
+$CollisionPath = [System.IO.Path]::ChangeExtension($OutputPath, ".collisions.txt")
+
 Write-Host "=== DXF TILE CENTRE ==="
 Write-Host "DXF : $DxfPath"
-Write-Host "Output : $OutputPath"
+Write-Host "OBJ : $OutputPath"
+Write-Host "Collisions : $CollisionPath"
 Write-Host "Width : $Width"
 Write-Host "Depth : $Depth"
 Write-Host "MaxFaces : $MaxFaces"
+Write-Host "CollisionCellSize : $CollisionCellSize"
 
-$extractArgs = @{
-    Path = $DxfPath
-    OutputPath = $OutputPath
-    Width = $Width
-    Depth = $Depth
-    MaxFaces = $MaxFaces
+$shouldExtract = $ForceExtract -or (-not (Test-Path $OutputPath))
+
+if ($shouldExtract) {
+    Write-Host ""
+    Write-Host "=== EXTRACT OBJ TILE ==="
+
+    $extractArgs = @{
+        Path = $DxfPath
+        OutputPath = $OutputPath
+        Width = $Width
+        Depth = $Depth
+        MaxFaces = $MaxFaces
+    }
+
+    if (-not [double]::IsNaN($CenterX)) {
+        $extractArgs["CenterX"] = $CenterX
+    }
+
+    if (-not [double]::IsNaN($CenterY)) {
+        $extractArgs["CenterY"] = $CenterY
+    }
+
+    & $ExtractScript @extractArgs
 }
-
-if (-not [double]::IsNaN($CenterX)) {
-    $extractArgs["CenterX"] = $CenterX
+else {
+    Write-Host ""
+    Write-Host "=== EXTRACT OBJ TILE ==="
+    Write-Host "Cache hit: OBJ already exists. Use -ForceExtract to regenerate."
 }
-
-if (-not [double]::IsNaN($CenterY)) {
-    $extractArgs["CenterY"] = $CenterY
-}
-
-& $ExtractScript @extractArgs
 
 if (-not (Test-Path $OutputPath)) {
-    throw "Tile extraction did not create expected OBJ: $OutputPath"
+    throw "Expected OBJ missing after extraction step: $OutputPath"
 }
 
 if (-not $NoCollisions) {
-    if (-not (Test-Path $CollisionScript)) {
-        throw "Collision sidecar generator not found: $CollisionScript"
+    $shouldGenerateCollisions = $ForceCollisions -or $ForceExtract -or (-not (Test-Path $CollisionPath))
+
+    if ($shouldGenerateCollisions) {
+        if (-not (Test-Path $CollisionScript)) {
+            throw "Collision sidecar generator not found: $CollisionScript"
+        }
+
+        Write-Host ""
+        Write-Host "=== GENERATE COLLISION SIDECAR ==="
+
+        & $CollisionScript `
+            -Path $OutputPath `
+            -OutputPath $CollisionPath `
+            -CellSize $CollisionCellSize `
+            -MinWallHeight $CollisionMinWallHeight `
+            -MinColumnHeight $CollisionMinColumnHeight `
+            -ColumnPadding $CollisionColumnPadding `
+            -MaxBoxes $CollisionMaxBoxes
     }
+    else {
+        Write-Host ""
+        Write-Host "=== GENERATE COLLISION SIDECAR ==="
+        Write-Host "Cache hit: collision sidecar already exists. Use -ForceCollisions to regenerate."
+    }
+}
 
+if ($NoRun) {
     Write-Host ""
-    Write-Host "=== GENERATE GRID COLLISION SIDECAR ==="
-
-    & $CollisionScript `
-        -Path $OutputPath `
-        -CellSize $CollisionCellSize `
-        -MinWallHeight $CollisionMinWallHeight `
-        -MinColumnHeight $CollisionMinColumnHeight `
-        -ColumnPadding $CollisionColumnPadding `
-        -MaxBoxes $CollisionMaxBoxes
+    Write-Host "NoRun enabled. Generated assets are ready."
+    exit 0
 }
 
 Write-Host ""
