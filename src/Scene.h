@@ -27,6 +27,13 @@ struct SceneGroundPlane {
     float maxZ = 20.0f;
 };
 
+struct SceneDebugRenderOptions {
+    bool showBounds = false;
+    bool showGroundHeightfield = false;
+    bool showCollisions = false;
+    bool showWireframe = false;
+};
+
 struct Scene {
     Model model = {};
     bool modelLoaded = false;
@@ -44,7 +51,10 @@ struct Scene {
 
 void LoadScene(Scene* scene, const char* modelPath);
 void DrawScene(const Scene& scene);
-void DrawSceneDebug(const Scene& scene);
+void DrawSceneDebug(
+    const Scene& scene,
+    const SceneDebugRenderOptions& options
+);
 void UnloadScene(Scene* scene);
 
 void AdjustSceneGround(Scene* scene, float deltaY);

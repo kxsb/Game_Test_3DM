@@ -119,7 +119,11 @@ PlayerControllerState CreatePlayerController(const Camera3D& initialCamera) {
     player.playerBodyHeight = AppConfig::PlayerBodyHeight;
 
     player.mouseLookEnabled = true;
+
     player.collisionDebugEnabled = false;
+    player.groundDebugEnabled = false;
+    player.wireframeDebugEnabled = false;
+    player.boundsDebugEnabled = false;
 
     player.movementMode = PlayerMovementMode::Walk;
 
@@ -146,6 +150,18 @@ void UpdatePlayerController(PlayerControllerState* player, const CollisionWorld&
 
     if (IsKeyPressed(KEY_B)) {
         player->collisionDebugEnabled = !player->collisionDebugEnabled;
+    }
+
+    if (IsKeyPressed(KEY_G)) {
+        player->groundDebugEnabled = !player->groundDebugEnabled;
+    }
+
+    if (IsKeyPressed(KEY_V)) {
+        player->wireframeDebugEnabled = !player->wireframeDebugEnabled;
+    }
+
+    if (IsKeyPressed(KEY_N)) {
+        player->boundsDebugEnabled = !player->boundsDebugEnabled;
     }
 
     if (IsKeyPressed(KEY_F)) {
@@ -244,4 +260,5 @@ void ApplyPlayerToCamera(const PlayerControllerState& player, Camera3D* camera) 
     camera->position = player.position;
     camera->target = Vector3Add(player.position, ForwardFromAngles(player.yaw, player.pitch));
 }
+
 

@@ -311,7 +311,6 @@ void LoadScene(Scene* scene, const char* modelPath) {
 
         if (!scene->externalCollisionLoaded) {
             scene->collisionWorld.solidBoxes.clear();
-    scene->collisionWorld.solidSegments.clear();
             scene->collisionWorld.solidSegments.clear();
         }
 
@@ -401,22 +400,31 @@ void DrawScene(const Scene& scene) {
     if (scene.modelLoaded) {
         // Color WHITE laisse les matériaux OBJ/MTL faire leur travail.
         DrawModel(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
-
-        // Contours discrets pour lire les bâtiments et les rues.
-        DrawModelWires(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, Fade(BLACK, 0.22f));
     }
     else {
         DrawProceduralCity(scene.proceduralCity);
     }
 }
 
-void DrawSceneDebug(const Scene& scene) {
-    if (scene.modelLoaded && scene.modelStats.hasBounds) {
+void DrawSceneDebug(
+    const Scene& scene,
+    const SceneDebugRenderOptions& options
+) {
+    if (scene.modelLoaded && options.showWireframe) {
+        DrawModelWires(scene.model, { 0.0f, 0.0f, 0.0f }, 1.0f, Fade(BLACK, 0.22f));
+    }
+
+    if (scene.modelLoaded && scene.modelStats.hasBounds && options.showBounds) {
         DrawBoundingBox(scene.modelStats.bounds, BLUE);
     }
 
-    DrawGroundHeightfieldDebug(scene.collisionWorld.groundHeightfield);
-    DrawCollisionWorldDebug(scene.collisionWorld);
+    if (options.showGroundHeightfield) {
+        DrawGroundHeightfieldDebug(scene.collisionWorld.groundHeightfield);
+    }
+
+    if (options.showCollisions) {
+        DrawCollisionWorldDebug(scene.collisionWorld);
+    }
 }
 
 void UnloadScene(Scene* scene) {
@@ -456,6 +464,7 @@ void ResetSceneGroundToEstimated(Scene* scene) {
         scene->groundPlane.y = scene->collisionWorld.groundY;
     }
 }
+
 
 
 

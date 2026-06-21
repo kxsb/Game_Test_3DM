@@ -26,7 +26,11 @@ struct PlayerControllerState {
     float playerBodyHeight;
 
     bool mouseLookEnabled;
+
     bool collisionDebugEnabled;
+    bool groundDebugEnabled;
+    bool wireframeDebugEnabled;
+    bool boundsDebugEnabled;
 
     PlayerMovementMode movementMode;
 };
@@ -44,3 +48,4 @@ void ApplyPlayerToCamera(
 );
 
 const char* GetPlayerMovementModeLabel(PlayerMovementMode mode);
+

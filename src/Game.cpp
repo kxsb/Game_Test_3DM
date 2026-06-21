@@ -48,8 +48,19 @@ int RunGame(int argc, char** argv) {
         BeginMode3D(camera);
         DrawScene(scene);
 
-        if (player.collisionDebugEnabled) {
-            DrawSceneDebug(scene);
+        SceneDebugRenderOptions debugOptions = {};
+        debugOptions.showBounds = player.boundsDebugEnabled;
+        debugOptions.showGroundHeightfield = player.groundDebugEnabled;
+        debugOptions.showCollisions = player.collisionDebugEnabled;
+        debugOptions.showWireframe = player.wireframeDebugEnabled;
+
+        if (
+            debugOptions.showBounds ||
+            debugOptions.showGroundHeightfield ||
+            debugOptions.showCollisions ||
+            debugOptions.showWireframe
+        ) {
+            DrawSceneDebug(scene, debugOptions);
         }
 
         EndMode3D();
@@ -66,3 +77,4 @@ int RunGame(int argc, char** argv) {
 
     return 0;
 }
+

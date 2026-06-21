@@ -37,11 +37,14 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     );
 
     DrawText(
-        TextFormat("Collisions: %d boites + %d segments | rayon joueur %.2f | debug B: %s",
+        TextFormat("Collisions: %d boites + %d segments | rayon joueur %.2f | B:%s G:%s V:%s N:%s",
             static_cast<int>(scene.collisionWorld.solidBoxes.size()),
             static_cast<int>(scene.collisionWorld.solidSegments.size()),
             player.playerRadius,
-            player.collisionDebugEnabled ? "ON" : "OFF"
+            player.collisionDebugEnabled ? "ON" : "OFF",
+            player.groundDebugEnabled ? "ON" : "OFF",
+            player.wireframeDebugEnabled ? "ON" : "OFF",
+            player.boundsDebugEnabled ? "ON" : "OFF"
         ),
         16,
         108,
@@ -107,7 +110,7 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
     }
 
     DrawText(
-        "B affiche bounds bleus + empreintes collisions rouges",
+        "B collisions rouges | G sol/heightfield | V wireframe | N bounds bleus",
         16,
         196,
         16,
@@ -144,5 +147,6 @@ void DrawHud(const Scene& scene, const PlayerControllerState& player) {
 
     DrawFPS(16, 290);
 }
+
 
 
