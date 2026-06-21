@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$Path,
 
@@ -11,6 +11,8 @@ param(
     [double]$MinColumnHeight = 1.5,
 
     [double]$ColumnPadding = 0.15,
+
+    [double]$BaseVertexTolerance = 0.45,
 
     [int]$MaxBoxes = 4000
 )
@@ -97,6 +99,57 @@ function Add-CellOccupation {
     }
 }
 
+function Add-PointToCollisionGrid {
+    param(
+        [hashtable]$Cells,
+        [double]$X,
+        [double]$Z,
+        [double]$MinY,
+        [double]$MaxY
+    )
+
+    $ix = [Math]::Floor($X / $script:GridCellSize)
+    $iz = [Math]::Floor($Z / $script:GridCellSize)
+
+    Add-CellOccupation `
+        -Cells $Cells `
+        -Ix $ix `
+        -Iz $iz `
+        -MinY $MinY `
+        -MaxY $MaxY
+}
+
+function Add-SegmentToCollisionGrid {
+    param(
+        [hashtable]$Cells,
+        [object]$A,
+        [object]$B,
+        [double]$MinY,
+        [double]$MaxY
+    )
+
+    $dx = $B.X - $A.X
+    $dz = $B.Z - $A.Z
+    $length = [Math]::Sqrt(($dx * $dx) + ($dz * $dz))
+
+    $stepSize = [Math]::Max(0.50, $script:GridCellSize * 0.35)
+    $steps = [Math]::Max(1, [int][Math]::Ceiling($length / $stepSize))
+
+    for ($i = 0; $i -le $steps; $i++) {
+        $t = [double]$i / [double]$steps
+
+        $x = $A.X + ($dx * $t)
+        $z = $A.Z + ($dz * $t)
+
+        Add-PointToCollisionGrid `
+            -Cells $Cells `
+            -X $x `
+            -Z $z `
+            -MinY $MinY `
+            -MaxY $MaxY
+    }
+}
+
 function Add-TriangleToCollisionGrid {
     param(
         [object]$A,
@@ -105,15 +158,8 @@ function Add-TriangleToCollisionGrid {
         [hashtable]$Cells
     )
 
-    $minX = Get-Min3 $A.X $B.X $C.X
-    $maxX = Get-Max3 $A.X $B.X $C.X
-
     $minY = Get-Min3 $A.Y $B.Y $C.Y
     $maxY = Get-Max3 $A.Y $B.Y $C.Y
-
-    $minZ = Get-Min3 $A.Z $B.Z $C.Z
-    $maxZ = Get-Max3 $A.Z $B.Z $C.Z
-
     $height = $maxY - $minY
 
     if ($height -lt $script:MinimumWallHeight) {
@@ -122,22 +168,63 @@ function Add-TriangleToCollisionGrid {
 
     $script:ContributingTriangles++
 
-    $minIx = [Math]::Floor($minX / $script:GridCellSize)
-    $maxIx = [Math]::Floor($maxX / $script:GridCellSize)
+    $lowVertices = New-Object System.Collections.Generic.List[object]
 
-    $minIz = [Math]::Floor($minZ / $script:GridCellSize)
-    $maxIz = [Math]::Floor($maxZ / $script:GridCellSize)
-
-    for ($ix = $minIx; $ix -le $maxIx; $ix++) {
-        for ($iz = $minIz; $iz -le $maxIz; $iz++) {
-            Add-CellOccupation `
-                -Cells $Cells `
-                -Ix $ix `
-                -Iz $iz `
-                -MinY $minY `
-                -MaxY $maxY
-        }
+    if ([Math]::Abs($A.Y - $minY) -le $script:BaseVertexTolerance) {
+        $lowVertices.Add($A)
     }
+
+    if ([Math]::Abs($B.Y - $minY) -le $script:BaseVertexTolerance) {
+        $lowVertices.Add($B)
+    }
+
+    if ([Math]::Abs($C.Y - $minY) -le $script:BaseVertexTolerance) {
+        $lowVertices.Add($C)
+    }
+
+    if ($lowVertices.Count -ge 2) {
+        for ($i = 0; $i -lt $lowVertices.Count; $i++) {
+            for ($j = $i + 1; $j -lt $lowVertices.Count; $j++) {
+                Add-SegmentToCollisionGrid `
+                    -Cells $Cells `
+                    -A $lowVertices[$i] `
+                    -B $lowVertices[$j] `
+                    -MinY $minY `
+                    -MaxY $maxY
+            }
+        }
+
+        return
+    }
+
+    if ($lowVertices.Count -eq 1) {
+        Add-PointToCollisionGrid `
+            -Cells $Cells `
+            -X $lowVertices[0].X `
+            -Z $lowVertices[0].Z `
+            -MinY $minY `
+            -MaxY $maxY
+
+        return
+    }
+
+    # Repli prudent : au pire, on marque le plus bas des trois points.
+    $lowest = $A
+
+    if ($B.Y -lt $lowest.Y) {
+        $lowest = $B
+    }
+
+    if ($C.Y -lt $lowest.Y) {
+        $lowest = $C
+    }
+
+    Add-PointToCollisionGrid `
+        -Cells $Cells `
+        -X $lowest.X `
+        -Z $lowest.Z `
+        -MinY $minY `
+        -MaxY $maxY
 }
 
 function Get-NextRemainingCell {
@@ -387,6 +474,8 @@ $collisionLines.Add("# CellSize: $CellSize")
 $collisionLines.Add("# MinWallHeight: $MinWallHeight")
 $collisionLines.Add("# MinColumnHeight: $MinColumnHeight")
 $collisionLines.Add("# ColumnPadding: $ColumnPadding")
+$collisionLines.Add("# Mode: footprint_base_edges")
+$collisionLines.Add("# BaseVertexTolerance: $BaseVertexTolerance")
 
 foreach ($box in $boxes) {
     $collisionLines.Add(
@@ -405,3 +494,5 @@ Write-Host "Triangles contributing : $ContributingTriangles"
 Write-Host "Occupied cells before merge : $($cells.Count)"
 Write-Host "Collision boxes after merge : $($boxes.Count)"
 Write-Host "Cell size : $CellSize"
+Write-Host "Mode : footprint_base_edges"
+Write-Host "Base vertex tolerance : $BaseVertexTolerance"
