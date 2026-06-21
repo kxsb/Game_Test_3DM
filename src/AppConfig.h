@@ -1,0 +1,23 @@
+﻿#pragma once
+
+#include "raylib.h"
+
+namespace AppConfig {
+    constexpr int ScreenWidth = 1280;
+    constexpr int ScreenHeight = 720;
+
+    constexpr const char* WindowTitle = "Montpellier 3D Prototype";
+    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1C";
+    constexpr const char* DefaultModelPath = "assets/models/example.glb";
+
+    constexpr int TargetFps = 60;
+
+    constexpr Vector3 InitialCameraPosition = { 18.0f, 14.0f, 18.0f };
+    constexpr Vector3 InitialCameraTarget = { 0.0f, 2.0f, 0.0f };
+    constexpr Vector3 CameraUp = { 0.0f, 1.0f, 0.0f };
+
+    constexpr float CameraFovY = 45.0f;
+
+    constexpr int GridSlices = 40;
+    constexpr float GridSpacing = 1.0f;
+}
