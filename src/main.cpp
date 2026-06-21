@@ -1,6 +1,7 @@
 ﻿#include "raylib.h"
 #include "ModelUtils.h"
 #include "ProceduralCity.h"
+#include "CameraController.h"
 
 int main(int argc, char** argv) {
     const int screenWidth  = 1280;
@@ -14,6 +15,8 @@ int main(int argc, char** argv) {
     camera.up         = { 0.0f, 1.0f, 0.0f };
     camera.fovy       = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
+
+    CameraControllerState cameraController = CreateCameraController(camera);
 
     SetTargetFPS(60);
 
@@ -40,7 +43,7 @@ int main(int argc, char** argv) {
     ProceduralCity proceduralCity = CreateProceduralCity();
 
     while (!WindowShouldClose()) {
-        UpdateCamera(&camera, CAMERA_FREE);
+        UpdateCameraController(&camera, &cameraController);
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -58,11 +61,13 @@ int main(int argc, char** argv) {
 
         EndMode3D();
 
-        DrawRectangle(8, 8, 500, 86, Fade(RAYWHITE, 0.86f));
-        DrawText("Montpellier Game - Prototype 1A", 16, 16, 20, DARKGRAY);
+        DrawRectangle(8, 8, 590, 128, Fade(RAYWHITE, 0.88f));
+        DrawText("Montpellier Game - Prototype 1B", 16, 16, 20, DARKGRAY);
         DrawText(modelLoaded ? "Mode: modele charge" : "Mode: mini-ville procedurale", 16, 42, 16, GRAY);
-        DrawText("Camera: souris + WASD, Q/E vertical", 16, 64, 16, GRAY);
-        DrawFPS(16, 92);
+        DrawText("Camera: souris + ZQSD/WASD, E monte, C descend", 16, 64, 16, GRAY);
+        DrawText("TAB libere/capture souris | molette vitesse | Shift accelere | R reset", 16, 86, 16, GRAY);
+        DrawText(TextFormat("Vitesse: %.1f", cameraController.moveSpeed), 16, 108, 16, GRAY);
+        DrawFPS(16, 136);
 
         EndDrawing();
     }
@@ -71,6 +76,8 @@ int main(int argc, char** argv) {
         UnloadModel(model);
     }
 
+    EnableCursor();
     CloseWindow();
+
     return 0;
 }
