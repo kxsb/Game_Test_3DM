@@ -26,6 +26,7 @@ FetchContent_MakeAvailable(raylib)
 add_executable(montpellier
   src/main.cpp
   src/ModelUtils.cpp
+  src/ProceduralCity.cpp
 )
 
 # Link against the raylib target.  Raylib brings in all required
@@ -40,3 +41,4 @@ add_custom_command(TARGET montpellier POST_BUILD
           ${CMAKE_SOURCE_DIR}/assets
           $<TARGET_FILE_DIR:montpellier>/assets
 )
+
