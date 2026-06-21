@@ -7,7 +7,7 @@ namespace AppConfig {
     constexpr int ScreenHeight = 720;
 
     constexpr const char* WindowTitle = "Montpellier 3D Prototype";
-    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1M-COLLISION-SEGMENTS";
+    constexpr const char* PrototypeLabel = "Montpellier Game - Prototype 1N-CITYGML-TILE";
     constexpr const char* DefaultModelPath = "assets/models/example.glb";
 
     constexpr int TargetFps = 60;
@@ -35,6 +35,7 @@ namespace AppConfig {
     constexpr int GridSlices = 40;
     constexpr float GridSpacing = 1.0f;
 }
+
 
 
 

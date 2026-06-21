@@ -1,0 +1,29 @@
+# Montpellier Game CityGML materials
+
+newmtl citygml_ground
+Ka 0.24 0.32 0.25
+Kd 0.40 0.52 0.42
+Ks 0.00 0.00 0.00
+d 1.0
+illum 1
+
+newmtl citygml_wall
+Ka 0.50 0.48 0.43
+Kd 0.72 0.70 0.62
+Ks 0.00 0.00 0.00
+d 1.0
+illum 1
+
+newmtl citygml_roof
+Ka 0.35 0.35 0.37
+Kd 0.54 0.54 0.58
+Ks 0.00 0.00 0.00
+d 1.0
+illum 1
+
+newmtl citygml_generic
+Ka 0.46 0.46 0.44
+Kd 0.68 0.68 0.64
+Ks 0.00 0.00 0.00
+d 1.0
+illum 1
